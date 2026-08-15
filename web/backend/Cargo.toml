@@ -1,0 +1,12 @@
+# mochou-p/game/web/backend/Cargo.toml
+
+[package]
+name    = "web_backend"
+edition = "2024"
+
+[[bin]]
+name    = "web_backend"
+
+[dependencies]
+rspond  = { git = "https://github.com/mochou-p/rspond" }
+
