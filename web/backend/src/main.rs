@@ -13,7 +13,7 @@ async fn main() {
 
     let server = TcpListener::bind(format!("{ADDRESS}:{PORT}")).await.unwrap();
 
-    println!("\x1b[32;1m> online\x1b[0m");
+    println!("\x1b[32;1m> online\x1b[0m\n");
 
     loop {
         let (client, _) = server.accept().await.unwrap();

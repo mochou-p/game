@@ -1,8 +1,22 @@
 // mochou-p/game/web/backend/src/router.rs
 
-use rspond::prelude::*;
+use rspond::{ResponseBuilder, HttpVersion, StatusCode, Header, Connection, MimeType, Text, Charset};
 
 
+fn ok(line: String, mime_type: MimeType, body: Vec<u8>) -> Vec<u8> {
+    println!("\x1b[32;1m[200]\x1b[0m {line}");
+
+    ResponseBuilder::new()
+        .http_version(HttpVersion::OneOne)
+        .status_code(StatusCode::Ok)
+        .headers(vec![
+            Header::Connection(Connection::Close),
+            Header::ContentType(mime_type, Charset::Utf8),
+            Header::ContentLength(body.len())
+        ])
+        .body(&body)
+        .build()
+}
 pub fn bad_request(line: String) -> Vec<u8> {
     eprintln!("\x1b[31;1m[400]\x1b[0m {line}");
 
@@ -48,33 +62,19 @@ pub fn http_version_not_supported(line: String) -> Vec<u8> {
 }
 
 pub fn handle(line: String, method: &str, path: &str) -> Vec<u8> {
-    if method != "GET" { return not_implemented(line); }
-
-    get(line, path)
-}
-
-fn get(line: String, path: &str) -> Vec<u8> {
-    if path == "/" {
-        home(line)
-    } else {
-        not_found(line)
+    match method {
+        "GET" =>             get(line, path),
+        _     => not_implemented(line)
     }
 }
 
-fn home(line: String) -> Vec<u8> {
-    println!("\x1b[32;1m[200]\x1b[0m {line}");
-
-    let body = b"<!DOCTYPE html><html><body><h1>hi world</h1></body></html>";
-
-    ResponseBuilder::new()
-        .http_version(HttpVersion::OneOne)
-        .status_code(StatusCode::Ok)
-        .headers(vec![
-            Header::Connection(Connection::Close),
-            Header::ContentType(MimeType::Html, Charset::Utf8),
-            Header::ContentLength(body.len())
-        ])
-        .body(body)
-        .build()
+fn get(line: String, path: &str) -> Vec<u8> {
+    match path {
+        "/style.css" =>        ok(line, MimeType::Text(Text::Css ), web_frontend::     css()),
+        "/"          =>        ok(line, MimeType::Text(Text::Html), web_frontend::    home()),
+        "/users"     =>        ok(line, MimeType::Text(Text::Html), web_frontend::   users()),
+        "/register"  =>        ok(line, MimeType::Text(Text::Html), web_frontend::register()),
+        _            => not_found(line)
+    }
 }
 

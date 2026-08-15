@@ -115,7 +115,6 @@ dependencies = [
 [[package]]
 name = "rspond"
 version = "0.1.0"
-source = "git+https://github.com/mochou-p/rspond#a2849d8ae28f5b81a0a45bee0f92a65b948451e6"
 
 [[package]]
 name = "scopeguard"
@@ -206,7 +205,28 @@ version = "0.0.0"
 dependencies = [
  "rspond",
  "tokio",
+ "web_frontend",
 ]
+
+[[package]]
+name = "web_frontend"
+version = "0.0.0"
+dependencies = [
+ "webuild",
+]
+
+[[package]]
+name = "webuild"
+version = "0.0.0"
+source = "git+https://github.com/mochou-p/webuild#71f189cb229f712bbe78262cc8da853a6139fe9d"
+dependencies = [
+ "webuild_macros",
+]
+
+[[package]]
+name = "webuild_macros"
+version = "0.0.0"
+source = "git+https://github.com/mochou-p/webuild#71f189cb229f712bbe78262cc8da853a6139fe9d"
 
 [[package]]
 name = "windows-link"
