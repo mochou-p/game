@@ -2,35 +2,37 @@
 
 mod router;
 
-use std::io::{Read as _, Write as _};
-use std::net::{TcpListener, TcpStream};
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use tokio::net::{TcpListener, TcpStream};
 
 
-fn main() {
+#[tokio::main]
+async fn main() {
     const ADDRESS: &str = "127.0.0.1";
     const PORT:    u16  = 10069;
 
-    let server = TcpListener::bind(format!("{ADDRESS}:{PORT}")).unwrap();
+    let server = TcpListener::bind(format!("{ADDRESS}:{PORT}")).await.unwrap();
 
     println!("\x1b[32;1m> online\x1b[0m");
 
-    for client in server.incoming() {
-        handle_client(client.unwrap());
+    loop {
+        let (client, _) = server.accept().await.unwrap();
+        tokio::spawn(async move { handle_client(client).await; });
     }
 }
 
-fn handle_client(mut client: TcpStream) {
-    let request  =   read_request(&mut client);
+async fn handle_client(mut client: TcpStream) {
+    let request  =   read_request(&mut client).await;
     let response = handle_request(&request   );
 
-    client.write_all(&response).unwrap();
+    client.write_all(&response).await.unwrap();
 }
 
-fn read_request(client: &mut TcpStream) -> String {
+async fn read_request(client: &mut TcpStream) -> String {
     const LEN: usize = 1024;
 
     let mut buffer = [0; LEN];
-    let     count  = client.read(&mut buffer).unwrap();
+    let     count  = client.read(&mut buffer).await.unwrap();
 
     assert!(count < LEN);
 

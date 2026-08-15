@@ -8,5 +8,6 @@ edition = "2024"
 name    = "web_backend"
 
 [dependencies]
-rspond  = { git = "https://github.com/mochou-p/rspond" }
+rspond  = { git     = "https://github.com/mochou-p/rspond" }
+tokio   = { version = "1.53.1", features = ["full"]        }
 
