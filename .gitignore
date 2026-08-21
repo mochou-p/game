@@ -1,4 +1,5 @@
 # mochou-p/game/.gitignore
 
 target/
+data/db.*
 
