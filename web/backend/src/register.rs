@@ -1,51 +1,55 @@
 // mochou-p/game/web/backend/src/register.rs
 
-use std::collections::VecDeque;
 use rspond::{MimeType, Text};
 use rusqlite::{Connection, OpenFlags};
-use crate::router::{ok, bad_request};
+use crate::{router::{ok, bad_request}, utils::find_byte, Request};
 
 
-pub fn validate_body(line: String, lines: VecDeque<String>) -> Vec<u8> {
-    println!("{lines:?}");
-
-    let body       = &lines[lines.len() - 1];
-    let Some(equ1) = body.find('=') else { println!("error 1");return bad_request(line); };
+pub fn validate_body(request: Request) -> Vec<u8> {
+    let body       = request.body;
+    let Some(equ1) = find_byte(body, b'=') else { return bad_request(); };
     let key1       = &body[..equ1];
 
-    if key1 != "username" { println!("error 2");return bad_request(line); }
+    if key1 != b"username" { return bad_request(); }
 
     let body       = &body[equ1+1..];
-    let Some(amp1) = body.find('&') else { println!("error 3");return bad_request(line); };
+    let Some(amp1) = find_byte(body, b'&') else { return bad_request(); };
     let value1     = &body[..amp1];
 
     let Some(username) = undo_urlencoding(value1) else {
-        println!("error 4");return bad_request(line);
+        return bad_request();
     };
 
-    if username.is_empty() || username.chars().count() > 16 || !username.chars().all(|ch| is_char_allowed(ch)) {
-        println!("error 5");return bad_request(line);
+    if username.is_empty() || username.len() > 16 || !username.iter().all(|b| is_byte_allowed(*b)) {
+        return bad_request();
     }
 
     let body       = &body[amp1+1..];
-    let Some(equ2) = body.find('=') else { println!("error 6");return bad_request(line); };
+    let Some(equ2) = find_byte(body, b'=') else { return bad_request(); };
     let key2       = &body[..equ2];
 
-    if key2 != "password" { println!("error 7");return bad_request(line); }
+    if key2 != b"password" { return bad_request(); }
 
     let value2     = &body[equ2+1..];
 
     let Some(password) = undo_urlencoding(value2) else {
-        println!("error 8");return bad_request(line);
+        return bad_request();
     };
 
-    if password.is_empty() || password.chars().count() > 256 {
-        println!("error 9");return bad_request(line);
+    if password.is_empty() || password.len() > 256 {
+        return bad_request();
     }
+
+    let Ok(username) = String::from_utf8(username) else {
+        return bad_request();
+    };
+    let Ok(password) = String::from_utf8(password) else {
+        return bad_request();
+    };
 
     let worked = register(username, password);
 
-    ok(line, MimeType::Text(Text::Html), web_frontend::register(Some(worked)))
+    ok(MimeType::Text(Text::Html), web_frontend::register(Some(worked)))
 }
 
 fn register(username: String, password: String) -> bool {
@@ -84,22 +88,22 @@ fn register(username: String, password: String) -> bool {
     true
 }
 
-fn is_char_allowed(ch: char) -> bool {
-    match ch {
-        'A'..='Z' | 'a'..='z' | '0'..='9' | '_' | ' ' => true,
-        _                                             => false
+fn is_byte_allowed(byte: u8) -> bool {
+    match byte {
+        b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b' ' => true,
+        _                                                     => false
     }
 }
 
-fn undo_urlencoding(input: &str) -> Option<String> {
-    let mut chars = input.chars();
+fn undo_urlencoding(input: &[u8]) -> Option<Vec<u8>> {
+    let mut iter  = input.iter();
     let mut bytes = vec![];
     
-    while let Some(c) = chars.next() {
+    while let Some(c) = iter.next() {
         bytes.push(match c {
-            '%' => {
-                let Some(a) = chars.next() else { return None; };
-                let Some(b) = chars.next() else { return None; };
+            b'%' => {
+                let Some(a) = iter.next() else { return None; };
+                let Some(b) = iter.next() else { return None; };
 
                 let Ok(byte) = u8::from_str_radix(&format!("{a}{b}"), 16) else {
                     return None;
@@ -107,11 +111,11 @@ fn undo_urlencoding(input: &str) -> Option<String> {
 
                 byte
             },
-            '+' => b' ',
-            _   => c as u8
+            b'+' => b' ',
+            _    => *c as u8
         });
     }
 
-    String::from_utf8(bytes).ok()
+    Some(bytes)
 }
 

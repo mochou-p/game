@@ -1,13 +1,10 @@
 // mochou-p/game/web/backend/src/router.rs
 
-use std::collections::VecDeque;
 use rspond::{ResponseBuilder, HttpVersion, StatusCode, Header, Connection, MimeType, Text, Charset};
-use super::{register, users};
+use super::{register, users, Request};
 
 
-pub fn ok(line: String, mime_type: MimeType, body: Vec<u8>) -> Vec<u8> {
-    println!("\x1b[32;1m[200]\x1b[0m {line}");
-
+pub fn ok(mime_type: MimeType, body: Vec<u8>) -> Vec<u8> {
     ResponseBuilder::new()
         .http_version(HttpVersion::OneOne)
         .status_code(StatusCode::Ok)
@@ -20,9 +17,7 @@ pub fn ok(line: String, mime_type: MimeType, body: Vec<u8>) -> Vec<u8> {
         .build()
 }
 
-pub fn bad_request(line: String) -> Vec<u8> {
-    eprintln!("\x1b[31;1m[400]\x1b[0m {line}");
-
+pub fn bad_request() -> Vec<u8> {
     ResponseBuilder::new()
         .http_version(HttpVersion::OneOne)
         .status_code(StatusCode::BadRequest)
@@ -31,9 +26,7 @@ pub fn bad_request(line: String) -> Vec<u8> {
         .build()
 }
 
-pub fn not_found(line: String) -> Vec<u8> {
-    eprintln!("\x1b[33;1m[404]\x1b[0m {line}");
-
+pub fn not_found() -> Vec<u8> {
     ResponseBuilder::new()
         .http_version(HttpVersion::OneOne)
         .status_code(StatusCode::NotFound)
@@ -42,9 +35,7 @@ pub fn not_found(line: String) -> Vec<u8> {
         .build()
 }
 
-pub fn not_implemented(line: String) -> Vec<u8> {
-    eprintln!("\x1b[31;1m[501]\x1b[0m {line}");
-
+pub fn not_implemented() -> Vec<u8> {
     ResponseBuilder::new()
         .http_version(HttpVersion::OneOne)
         .status_code(StatusCode::NotImplemented)
@@ -53,9 +44,7 @@ pub fn not_implemented(line: String) -> Vec<u8> {
         .build()
 }
 
-pub fn http_version_not_supported(line: String) -> Vec<u8> {
-    eprintln!("\x1b[31;1m[505]\x1b[0m {line}");
-
+pub fn http_version_not_supported() -> Vec<u8> {
     ResponseBuilder::new()
         .http_version(HttpVersion::OneOne)
         .status_code(StatusCode::HttpVersionNotSupported)
@@ -64,30 +53,30 @@ pub fn http_version_not_supported(line: String) -> Vec<u8> {
         .build()
 }
 
-pub fn handle(line: String, lines: VecDeque<String>, method: &str, path: &str) -> Vec<u8> {
-    match method {
-        "GET"  =>             get(line, path),
-        "POST" =>            post(line, path, lines),
-        _      => not_implemented(line)
+pub fn handle(request: Request) -> Vec<u8> {
+    match request.method {
+        b"GET"  =>  get(request),
+        b"POST" => post(request),
+        _       => not_implemented()
     }
 }
 
-fn get(line: String, path: &str) -> Vec<u8> {
-    match path {
-        "/style.css" =>        ok(line, MimeType::Text(Text::Css ), web_frontend::     css(              )),
-        "/"          =>        ok(line, MimeType::Text(Text::Html), web_frontend::    home(              )),
-        "/users"     =>        ok(line, MimeType::Text(Text::Html), web_frontend::   users(users::query())),
-        "/register"  =>        ok(line, MimeType::Text(Text::Html), web_frontend::register(None          )),
-        _            => not_found(line)
+fn get(request: Request) -> Vec<u8> {
+    match request.path {
+        b"/style.css" =>        ok(MimeType::Text(Text::Css ), web_frontend::     css(              )),
+        b"/"          =>        ok(MimeType::Text(Text::Html), web_frontend::    home(              )),
+        b"/users"     =>        ok(MimeType::Text(Text::Html), web_frontend::   users(users::query())),
+        b"/register"  =>        ok(MimeType::Text(Text::Html), web_frontend::register(None          )),
+        _             => not_found()
     }
 }
 
-fn post(line: String, path: &str, lines: VecDeque<String>) -> Vec<u8> {
-    match path {
+fn post(request: Request) -> Vec<u8> {
+    match request.path {
         // NOTE: the parsing here is broken for values having unescaped '&' inside,
         //       fine for now since blablabla and password handling doesnt care
-        "/register" => register::validate_body(line, lines),
-        _           => not_found(line)
+        b"/register" => register::validate_body(request),
+        _            => not_found()
     }
 }
 

@@ -8,6 +8,8 @@ use navigation::{navigation, Nav};
 
 pub fn css() -> Vec<u8> {
     webuild::macros::css!(
+        // layout --------------------------------
+
         * {
             box-sizing: "border-box";
             border:     "none";
@@ -20,7 +22,6 @@ pub fn css() -> Vec<u8> {
             justify-content: "center";
             width:           "100vw";
             height:          "100vh";
-            background:      "#590d22";
         }
 
         body {
@@ -29,21 +30,11 @@ pub fn css() -> Vec<u8> {
             width:          "100%";
             max-width:      "800px";
             height:         "100%";
-            background:     "#800f2f";
-            color:          "#ffccd5";
-        }
-
-        a {
-            text-decoration: "none";
-            color:           "inherit";
         }
 
         nav {
             display:         "flex";
             justify-content: "space-between";
-            margin-bottom:   "2px";
-            background:      "#a4133c";
-            color:           "#ffb3c1";
         }
 
         main {
@@ -53,52 +44,45 @@ pub fn css() -> Vec<u8> {
             align-items:     "center";
         }
 
-        .nav-group {
+        nav > div {
             display: "flex";
+            gap:     "24px";
         }
 
-        .nav-group > a {
-            padding: "0 16px 0 16px";
+        // style ---------------------------------
+
+        a {
+            text-decoration: "none";
+            color:           "inherit";
         }
 
-        .nav-group > a:hover {
-            color: "#fff0f3";
-        }
-
-        .nav-current {
-            font-weight: "bold";
-            background:  "#ff4d6d";
-            color:       "#fff0f3";
-        }
-
-        input {
-            background: "#fff0f3";
-            color:      "#800f2f";
-        }
-
-        form > button {
-            background: "#ff4d6d";
-            color:      "#fff0f3";
-            padding:    "0 8px 0 8px";
-        }
-
-        form > button:hover {
-            cursor: "pointer";
+        a:hover {
+            text-decoration: "underline";
         }
 
         table {
-            background:      "#a4133c";
-            color:           "#ffb3c1";
             border-collapse: "collapse";
         }
 
         th, td {
-            border:  "1px solid #590d22";
+            border:  "1px solid #fff";
             padding: "0 8px 0 8px";
         }
 
-        th {
-            color: "#fff0f3";
+        html {
+            background: "#000";
+        }
+
+        body {
+            color: "#fff";
+        }
+
+        hr {
+            border: "1px solid #fff";
+        }
+
+        #nav-current {
+            font-weight: "900";
         }
     )
         .as_bytes()
@@ -110,7 +94,7 @@ fn base(title: &str, children: &[Tag]) -> Vec<u8> {
         .with_lang("en")
         .with_charset("UTF-8")
         .with_responsive_viewport(true)
-        .with_title(title)
+        .with_title(format!("{title} | game"))
         .with_css("style.css")
         .with_body_children(children)
         .build_html()
@@ -119,8 +103,9 @@ fn base(title: &str, children: &[Tag]) -> Vec<u8> {
 }
 
 pub fn home() -> Vec<u8> {
-    base("home | game", &[
+    base("home", &[
         navigation(Nav::Home),
+        Tag::new("hr"),
         content(&[
             Tag::new("p").children(&["welcome :D"])
         ])
@@ -150,8 +135,9 @@ pub fn users(users: Vec<(i64, String, String, i64)>) -> Vec<u8> {
         );
     }
 
-    base("users | game", &[
+    base("users", &[
         navigation(Nav::Users),
+        Tag::new("hr"),
         content(&[Tag::new("table").children(&rows)])
     ])
 }
@@ -196,8 +182,9 @@ pub fn register(registered: Option<bool>) -> Vec<u8> {
         ]
     };
 
-    base("registration | game", &[
+    base("register", &[
         navigation(Nav::Register),
+        Tag::new("hr"),
         content(children)
     ])
 }

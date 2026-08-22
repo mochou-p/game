@@ -31,29 +31,28 @@ impl Nav {
 pub fn navigation(current: Nav) -> Tag {
     Tag::new("header").children(&[
         Tag::new("nav").children(&[
-            Tag::new("div").attributes(&[("class", "nav-group")]).children(
-                &links(current, [Nav::Home, Nav::Users])
-            ),
-            Tag::new("div").attributes(&[("class", "nav-group")]).children(
-                &links(current, [Nav::Register])
-            )
+            Tag::new("div").children(&[
+                link(current, Nav::Home),
+                link(current, Nav::Users)
+            ]),
+            Tag::new("div").children(&[
+                link(current, Nav::Register)
+            ])
         ])
     ])
 }
 
-fn links<const N: usize>(current: Nav, navs: [Nav; N]) -> [Tag; N] {
-    navs.map(|nav| {
-        let attributes = if nav == current {
-            &[("href", nav.href()), ("class", "nav-current")] as &[(&str, &str)]
-        } else {
-            &[("href", nav.href())] as &[(&str, &str)]
-        };
+fn link(current: Nav, nav: Nav) -> Tag {
+    let attributes = if nav == current {
+        &[("href", nav.href()), ("id", "nav-current")] as &[(&str, &str)]
+    } else {
+        &[("href", nav.href())] as &[(&str, &str)]
+    };
 
-        Tag::new("a")
-            .attributes(attributes)
-            .children(&[
-                Tag::new("h3").children(&[nav.inner_text()])
-            ])
-    })
+    Tag::new("a")
+        .attributes(attributes)
+        .children(&[
+            Tag::new("p").children(&[nav.inner_text()])
+        ])
 }
 

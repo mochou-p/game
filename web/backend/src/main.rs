@@ -3,12 +3,16 @@
 mod router;
 mod register;
 mod users;
+mod utils;
 
-use std::collections::VecDeque;
+use std::collections::HashMap;
 use rusqlite::{Connection, OpenFlags};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::{TcpListener, TcpStream};
+use utils::{find_byte, find_bytes};
 
+
+const BUFFER_LEN: usize = 2048;
 
 fn setup_db() {
     let mut conn = Connection::open_with_flags(
@@ -57,38 +61,88 @@ async fn main() {
 }
 
 async fn handle_client(mut client: TcpStream) {
-    let request  =   read_request(&mut client).await;
-    let response = handle_request(&request   );
+    let (buffer, count) =   read_request(&mut client).await;
+    let response        = handle_request(&buffer[..count]);
 
     client.write_all(&response).await.unwrap();
 }
 
-async fn read_request(client: &mut TcpStream) -> String {
-    const LEN: usize = 2048;
-
-    let mut buffer = [0; LEN];
+async fn read_request(client: &mut TcpStream) -> ([u8; BUFFER_LEN], usize) {
+    let mut buffer = [0; BUFFER_LEN];
     let     count  = client.read(&mut buffer).await.unwrap();
 
-    assert!(count < LEN);
+    assert!(count < BUFFER_LEN);
 
-    String::from_utf8_lossy(&buffer[..count]).into_owned()
+    (buffer, count)
 }
 
-fn handle_request(request: &str) -> Vec<u8> {
-    let mut lines = request.lines().map(str::to_owned).collect::<VecDeque<String>>();
-
-    let Some(line) = lines.pop_front() else {
-        return router::bad_request(String::new());
+fn handle_request(data: &[u8]) -> Vec<u8> {
+    let Some(request) = Request::parse(data) else {
+        return router::bad_request();
     };
 
-    let mut parts = line.split_whitespace().map(str::to_owned).collect::<VecDeque<String>>();
+    if request.version != b"HTTP/1.1" {
+        return router::http_version_not_supported();
+    }
 
-    let Some(method ) = parts.pop_front() else { return router::bad_request(line); };
-    let Some(path   ) = parts.pop_front() else { return router::bad_request(line); };
-    let Some(version) = parts.pop_front() else { return router::bad_request(line); };
+    router::handle(request)
+}
 
-    if version != "HTTP/1.1" { return router::http_version_not_supported(line); }
+struct Request<'a> {
+    method:  &'a [u8],
+    path:    &'a [u8],
+    version: &'a [u8],
+    headers: HashMap<&'a [u8], &'a [u8]>,
+    body:    &'a [u8]
+}
 
-    router::handle(line, lines, &method, &path)
+impl<'a> Request<'a> {
+    fn parse(data: &'a [u8]) -> Option<Self> {
+        let window = data;
+
+        let Some(end) = find_byte(window, b' ') else {
+            return None;
+        };
+        let method = &window[..end];
+        let window = &window[end+1..];
+
+        let Some(end) = find_byte(window, b' ') else {
+            return None;
+        };
+        let path   = &window[..end];
+        let window = &window[end+1..];
+
+        let Some(end) = find_bytes(window, b"\r\n") else {
+            return None;
+        };
+        let version = &window[..end];
+        let window  = &window[end+2..];
+
+        let Some(body_start) = find_bytes(window, b"\r\n\r\n") else {
+            return None;
+        };
+
+        let mut header_range = &window[..body_start+2];
+        let     body         = &window[body_start+4..];
+        let mut headers      = HashMap::new();
+
+        while let Some(i) = find_bytes(header_range, b"\r\n") {
+            let line = &header_range[..i];
+
+            let Some(j) = find_bytes(line, b": ") else {
+                return None;
+            };
+            let key   = &line[..j];
+            let value = &line[j+2..];
+
+            if headers.insert(key, value).is_some() {
+                return None;
+            }
+
+            header_range = &header_range[i+2..];
+        }
+
+        Some(Self { method, path, version, headers, body })
+    }
 }
 
