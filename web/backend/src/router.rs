@@ -1,81 +1,34 @@
 // mochou-p/game/web/backend/src/router.rs
 
-use rspond::{ResponseBuilder, HttpVersion, StatusCode, Header, Connection, MimeType, Text, Charset};
-use super::{register, users, Request};
+use rspond::*;
+use web_frontend::*;
+use super::{response::*, register, login, logout, users, Request};
 
-
-pub fn ok(mime_type: MimeType, body: Vec<u8>) -> Vec<u8> {
-    ResponseBuilder::new()
-        .http_version(HttpVersion::OneOne)
-        .status_code(StatusCode::Ok)
-        .headers(vec![
-            Header::Connection(Connection::Close),
-            Header::ContentType(mime_type, Charset::Utf8),
-            Header::ContentLength(body.len())
-        ])
-        .body(&body)
-        .build()
-}
-
-pub fn bad_request() -> Vec<u8> {
-    ResponseBuilder::new()
-        .http_version(HttpVersion::OneOne)
-        .status_code(StatusCode::BadRequest)
-        .headers(vec![Header::Connection(Connection::Close)])
-        .empty_body()
-        .build()
-}
-
-pub fn not_found() -> Vec<u8> {
-    ResponseBuilder::new()
-        .http_version(HttpVersion::OneOne)
-        .status_code(StatusCode::NotFound)
-        .headers(vec![Header::Connection(Connection::Close)])
-        .empty_body()
-        .build()
-}
-
-pub fn not_implemented() -> Vec<u8> {
-    ResponseBuilder::new()
-        .http_version(HttpVersion::OneOne)
-        .status_code(StatusCode::NotImplemented)
-        .headers(vec![Header::Connection(Connection::Close)])
-        .empty_body()
-        .build()
-}
-
-pub fn http_version_not_supported() -> Vec<u8> {
-    ResponseBuilder::new()
-        .http_version(HttpVersion::OneOne)
-        .status_code(StatusCode::HttpVersionNotSupported)
-        .headers(vec![Header::Connection(Connection::Close)])
-        .empty_body()
-        .build()
-}
 
 pub fn handle(request: Request) -> Vec<u8> {
     match request.method {
-        b"GET"  =>  get(request),
-        b"POST" => post(request),
+        b"GET"  =>  get(request.path, request.headers.get(b"Cookie" as &[u8])),
+        b"POST" => post(request.path, request.body),
         _       => not_implemented()
     }
 }
 
-fn get(request: Request) -> Vec<u8> {
-    match request.path {
-        b"/style.css" =>        ok(MimeType::Text(Text::Css ), web_frontend::     css(              )),
-        b"/"          =>        ok(MimeType::Text(Text::Html), web_frontend::    home(              )),
-        b"/users"     =>        ok(MimeType::Text(Text::Html), web_frontend::   users(users::query())),
-        b"/register"  =>        ok(MimeType::Text(Text::Html), web_frontend::register(None          )),
+fn get(path: &[u8], token: Option<&&[u8]>) -> Vec<u8> {
+    match path {
+        b"/style.css" =>        ok(MediaType::Text(Text::Css,  Charset::Utf8),    css()),
+        b"/"          =>        ok(MediaType::Text(Text::Html, Charset::Utf8), render(users::from(token), Page::Home                 )),
+        b"/users"     =>        ok(MediaType::Text(Text::Html, Charset::Utf8), render(users::from(token), Page::Users(users::query()))),
+        b"/register"  =>        ok(MediaType::Text(Text::Html, Charset::Utf8), render(users::from(token), Page::Register             )),
+        b"/login"     =>        ok(MediaType::Text(Text::Html, Charset::Utf8), render(users::from(token), Page::Login                )),
         _             => not_found()
     }
 }
 
-fn post(request: Request) -> Vec<u8> {
-    match request.path {
-        // NOTE: the parsing here is broken for values having unescaped '&' inside,
-        //       fine for now since blablabla and password handling doesnt care
-        b"/register" => register::validate_body(request),
+fn post(path: &[u8], body: &[u8]) -> Vec<u8> {
+    match path {
+        b"/register" => register::validate_body(body),
+        b"/login"    =>    login::validate_body(body),
+        b"/logout"   =>   logout::remove_cookie(),
         _            => not_found()
     }
 }

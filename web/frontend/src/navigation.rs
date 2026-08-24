@@ -3,56 +3,72 @@
 use webuild::Tag;
 
 
-#[derive(Copy, Clone, PartialEq)]
+const NAV_HEADING: &str = "h3";
+
+#[derive(PartialEq)]
 pub enum Nav {
     Home,
     Users,
-    Register
+    Register,
+    Login,
+    User(String),
+    Logout
 }
 
 impl Nav {
-    fn href(self) -> &'static str {
+    fn render(&self, current: &Self) -> Tag {
         match self {
-            Self::Home     => "/",
-            Self::Users    => "/users",
-            Self::Register => "/register"
-        }
-    }
-
-    fn inner_text(self) -> &'static str {
-        match self {
-            Self::Home     => "home",
-            Self::Users    => "users",
-            Self::Register => "register"
+            Self::Home           => link(self, current,          "/",                  "home"    ),
+            Self::Users          => link(self, current,          "/users",             "users"   ),
+            Self::Register       => link(self, current,          "/register",          "register"),
+            Self::Login          => link(self, current,          "/login",             "login"   ),
+            Self::User(username) => link(self, current, &format!("/users/{username}"), username  ),
+            Self::Logout         => {
+                Tag::new("form").attributes(&[("method", "POST"), ("action", "/logout")]).children(&[
+                    Tag::new("button").attributes(&[("type", "submit")]).children(&[
+                        Tag::new(NAV_HEADING).children(&["logout"])
+                    ])
+                ])
+            }
         }
     }
 }
 
-pub fn navigation(current: Nav) -> Tag {
+pub fn navigation(loginee: Option<String>, current: Nav) -> Tag {
     Tag::new("header").children(&[
         Tag::new("nav").children(&[
             Tag::new("div").children(&[
-                link(current, Nav::Home),
-                link(current, Nav::Users)
+                Nav::Home .render(&current),
+                Nav::Users.render(&current)
             ]),
-            Tag::new("div").children(&[
-                link(current, Nav::Register)
-            ])
+            Tag::new("div").children(
+                &if let Some(username) = loginee {
+                    [
+                        Nav::User(username).render(&current),
+                        Nav::Logout        .render(&current)
+                    ]
+                } else {
+                    [
+                        Nav::Register.render(&current),
+                        Nav::Login   .render(&current)
+                    ]
+                }
+            )
         ])
     ])
 }
 
-fn link(current: Nav, nav: Nav) -> Tag {
-    let attributes = if nav == current {
-        &[("href", nav.href()), ("id", "nav-current")] as &[(&str, &str)]
+fn link(nav: &Nav, current: &Nav, href: &str, text: &str) -> Tag {
+    let attributes = if *nav == *current {
+        &[("href", href), ("id", "nav-current")] as &[(&str, &str)]
     } else {
-        &[("href", nav.href())] as &[(&str, &str)]
+        &[("href", href)] as &[(&str, &str)]
     };
 
     Tag::new("a")
         .attributes(attributes)
         .children(&[
-            Tag::new("p").children(&[nav.inner_text()])
+            Tag::new(NAV_HEADING).children(&[text])
         ])
 }
 
