@@ -3,6 +3,7 @@
 [workspace]
 members  = [
     "database/core",
+    "game/client",
     "web/backend",
     "web/frontend"
 ]

@@ -1,0 +1,9 @@
+# mochou-p/game/game/client/Cargo.toml
+
+[package]
+name    = "game_client"
+edition = "2024"
+
+[dependencies]
+ggez    = "0.10.0"
+
