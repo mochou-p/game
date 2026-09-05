@@ -1,6 +1,10 @@
 # mochou-p/game/Cargo.toml
 
 [workspace]
-members  = ["web/backend"]
+members  = [
+    "database/core",
+    "web/backend",
+    "web/frontend"
+]
 resolver = "3"
 

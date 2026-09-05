@@ -37,6 +37,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
+name = "database_core"
+version = "0.0.0"
+dependencies = [
+ "rusqlite",
+]
+
+[[package]]
 name = "errno"
 version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -215,6 +222,7 @@ dependencies = [
 [[package]]
 name = "rspond"
 version = "0.1.0"
+source = "git+https://github.com/mochou-p/rspond#b0eda53b9df125bc2b04e16ae8732e557da598a3"
 
 [[package]]
 name = "rsqlite-vfs"
@@ -434,8 +442,8 @@ dependencies = [
 name = "web_backend"
 version = "0.0.0"
 dependencies = [
+ "database_core",
  "rspond",
- "rusqlite",
  "tokio",
  "web_frontend",
 ]
@@ -450,15 +458,7 @@ dependencies = [
 [[package]]
 name = "webuild"
 version = "0.0.0"
-source = "git+https://github.com/mochou-p/webuild#71f189cb229f712bbe78262cc8da853a6139fe9d"
-dependencies = [
- "webuild_macros",
-]
-
-[[package]]
-name = "webuild_macros"
-version = "0.0.0"
-source = "git+https://github.com/mochou-p/webuild#71f189cb229f712bbe78262cc8da853a6139fe9d"
+source = "git+https://github.com/mochou-p/webuild#bf63e03828f3ac1a36fbfcf2b999ab1c3ee1dc97"
 
 [[package]]
 name = "windows-link"

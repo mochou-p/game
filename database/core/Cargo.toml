@@ -1,0 +1,9 @@
+# mochou-p/game/database/core/Cargo.toml
+
+[package]
+name     = "database_core"
+edition  = "2024"
+
+[dependencies]
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+

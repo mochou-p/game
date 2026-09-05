@@ -16,7 +16,7 @@ pub struct Request<'a> {
 
 impl<'a> Request<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
-        let     window           = data;
+        let     window       = data;
 
         let     end          = utils::find_byte(window, b' ')?;
         let     method       = &window[..end];

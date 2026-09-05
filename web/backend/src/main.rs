@@ -7,58 +7,25 @@ mod register;
 mod login;
 mod logout;
 mod users;
+mod validation;
 mod utils;
 
-use rusqlite::{Connection, OpenFlags};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::{TcpListener, TcpStream};
 use request::Request;
 
 
-fn setup_db() {
-    let mut conn = Connection::open_with_flags(
-        "data/db.db",
-        OpenFlags::SQLITE_OPEN_READ_WRITE |
-        OpenFlags::SQLITE_OPEN_CREATE     |
-        OpenFlags::SQLITE_OPEN_NO_MUTEX
-    ).unwrap();
-
-    conn.execute_batch("
-        PRAGMA journal_mode = WAL;
-        PRAGMA busy_timeout = 5000;
-        PRAGMA foreign_keys = ON;
-    ").unwrap();
-
-    let tx = conn.transaction().unwrap();
-
-    tx.execute_batch("
-        CREATE TABLE IF NOT EXISTS users (
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            username  TEXT NOT NULL UNIQUE,
-            password  TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS sessions (
-            token    TEXT PRIMARY KEY,
-            user_id  INTEGER NOT NULL,
-
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        );
-    ").unwrap();
-
-    tx.commit().unwrap();
-}
-
 #[tokio::main]
 async fn main() {
-    setup_db();
+    database_core::setup();
 
-    const ADDRESS: &str = "127.0.0.1";
-    const PORT:    u16  = 10069;
+    const ADDRESS: [u8; 4] = [127, 0, 0, 1];
+    const PORT:    u16     = 10069;
 
-    let server = TcpListener::bind(format!("{ADDRESS}:{PORT}")).await.unwrap();
+    let address = format!("{}.{}.{}.{}:{PORT}", ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3]);
+    let server  = TcpListener::bind(address).await.unwrap();
 
-    println!("\x1b[32;1m[online]\x1b[0m");
+    println!("\x1b[32;1m[{} online]\x1b[0m", env!("CARGO_BIN_NAME"));
 
     loop {
         let (client, _) = server.accept().await.unwrap();

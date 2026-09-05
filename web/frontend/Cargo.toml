@@ -5,5 +5,5 @@ name    = "web_frontend"
 edition = "2024"
 
 [dependencies]
-webuild = { git = "https://github.com/mochou-p/webuild", features = ["macros"] }
+webuild = { git = "https://github.com/mochou-p/webuild" }
 

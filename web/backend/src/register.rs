@@ -1,76 +1,25 @@
 // mochou-p/game/web/backend/src/register.rs
 
-use rspond::*;
-use rusqlite::{Connection, OpenFlags, Result};
-use super::{response, utils};
+use super::{response, validation};
 
 
 pub fn validate_body(body: &[u8]) -> Vec<u8> {
-    let Some((username, password)) = utils::parse_signin_info(body) else {
+    let Some((username, password)) = validation::parse_signin_info(body) else {
         return response::bad_request();
     };
 
-    let Some(token) = register(username.clone(), password) else {
+    let Some(token) = database_core::register(username.clone(), password) else {
         return response::internal_server_error();
     };
 
     response::see_other(
         format!("/users/{username}"),
         vec![
-            Header::Custom(
+            rspond::Header::Custom(
                 String::from("Set-Cookie"),
                 format!("token={token}; HttpOnly; SameSite=Lax; Path=/")
             )
         ]
     )
-}
-
-// TODO: Option -> Result
-fn register(username: String, password: String) -> Option<String> {
-    let token = username.clone();
-
-    let Ok(mut conn) = Connection::open_with_flags(
-        "data/db.db",
-        OpenFlags::SQLITE_OPEN_READ_WRITE |
-        OpenFlags::SQLITE_OPEN_CREATE     |
-        OpenFlags::SQLITE_OPEN_NO_MUTEX
-    ) else {
-        return None;
-    };
-
-    if
-        conn.execute_batch("
-            PRAGMA journal_mode = WAL;
-            PRAGMA busy_timeout = 5000;
-            PRAGMA foreign_keys = ON;
-        ").is_err()
-    {
-        return None;
-    }
-
-    let Ok(tx) = conn.transaction() else {
-        return None;
-    };
-
-    let Ok(Some(user_id)): Result<Option<i64>> = tx.query_row(
-        "INSERT INTO users (username, password) VALUES (?1, ?2) RETURNING id",
-        (username, password),
-        |row| row.get(0)
-    ) else {
-        return None;
-    };
-
-    if tx.execute(
-        "INSERT INTO sessions (token, user_id) VALUES (?1, ?2)",
-        (token.clone(), user_id)
-    ).is_err() {
-        return None;
-    }
-
-    if tx.commit().is_err() {
-        return None;
-    }
-
-    Some(token)
 }
 

@@ -1,16 +1,12 @@
 # mochou-p/game/web/backend/Cargo.toml
 
 [package]
-name         = "web_backend"
-edition      = "2024"
-
-[[bin]]
-name         = "web_backend"
+name          = "web_backend"
+edition       = "2024"
 
 [dependencies]
-web_frontend = { path    = "../frontend"                        }
-#rspond       = { git     = "https://github.com/mochou-p/rspond" }
-rspond       = { path    = "../../../rspond" } # TEMP
-tokio        = { version = "1.53.1", features = ["full"]        }
-rusqlite     = { version = "0.40.2", features = ["bundled"]     }
+database_core = { path    = "../../database/core"                }
+web_frontend  = { path    = "../frontend"                        }
+rspond        = { git     = "https://github.com/mochou-p/rspond" }
+tokio         = { version = "1.53.1", features = ["full"]        }
 

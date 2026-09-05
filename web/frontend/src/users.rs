@@ -1,7 +1,7 @@
 // mochou-p/game/web/frontend/src/users.rs
 
 use webuild::Tag;
-use crate::{base, content, navigation::{Nav, navigation}};
+use super::{base, content, navigation::{Nav, navigation}};
 
 
 pub fn render(loginee: Option<String>, users: Vec<String>) -> Vec<u8> {
@@ -17,7 +17,9 @@ pub fn render(loginee: Option<String>, users: Vec<String>) -> Vec<u8> {
         rows.push(
             Tag::new("tr").children(&[
                 Tag::new("td").children(&[
-                    Tag::new("a").attributes(&[("href", &format!("/users/{name}"))]).children(&[&name])
+                    Tag::new("a")
+                        .attributes(&[("href", format!("/users/{name}").as_str())])
+                        .children(&[name.as_str()])
                 ])
             ])
         );
