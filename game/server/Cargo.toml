@@ -1,0 +1,10 @@
+# mochou-p/game/game/server/Cargo.toml
+
+[package]
+name          = "game_server"
+edition       = "2024"
+
+[dependencies]
+database_core = { workspace = true }
+tokio         = { workspace = true }
+

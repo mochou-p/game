@@ -5,8 +5,8 @@ name          = "web_backend"
 edition       = "2024"
 
 [dependencies]
-database_core = { path    = "../../database/core"                }
-web_frontend  = { path    = "../frontend"                        }
-rspond        = { git     = "https://github.com/mochou-p/rspond" }
-tokio         = { version = "1.53.1", features = ["full"]        }
+database_core = { workspace = true                                 }
+rspond        = { git       = "https://github.com/mochou-p/rspond" }
+tokio         = { workspace = true                                 }
+web_frontend  = { path      = "../frontend"                        }
 

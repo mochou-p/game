@@ -4,8 +4,13 @@
 members  = [
     "database/core",
     "game/client",
+    "game/server",
     "web/backend",
     "web/frontend"
 ]
 resolver = "3"
+
+[workspace.dependencies]
+database_core = { path    = "database/core"               }
+tokio         = { version = "1.53.1", features = ["full"] }
 

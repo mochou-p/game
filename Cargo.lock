@@ -751,6 +751,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "game_server"
+version = "0.0.0"
+dependencies = [
+ "database_core",
+ "tokio",
+]
+
+[[package]]
 name = "gethostname"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
