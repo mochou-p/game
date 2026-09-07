@@ -1,9 +1,11 @@
 # mochou-p/game/game/client/Cargo.toml
 
 [package]
-name    = "game_client"
-edition = "2024"
+name          = "game_client"
+edition       = "2024"
 
 [dependencies]
-ggez    = "0.10.0"
+game_protocol = { workspace = true }
+ggez          = "0.10.0"
+tokio         = { workspace = true }
 

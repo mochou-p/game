@@ -6,9 +6,8 @@ use tokio::sync::watch::Receiver;
 
 pub async fn bind(mut stop: Receiver<bool>) {
     const ADDRESS: [u8; 4] = [127, 0, 0, 1];
-    const PORT:    u16     = 10079;
 
-    let  address = format!("{}.{}.{}.{}:{PORT}", ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3]);
+    let  address = format!("{}.{}.{}.{}:{}", ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3], game_protocol::TCP_PORT);
     let _server  = TcpListener::bind(address).await.unwrap();
 
     println!("\x1b[32;1m[{} TCP online]\x1b[0m", env!("CARGO_BIN_NAME"));

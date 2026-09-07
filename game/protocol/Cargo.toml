@@ -1,0 +1,6 @@
+# mochou-p/game/game/protocol/Cargo.toml
+
+[package]
+name    = "game_protocol"
+edition = "2024"
+

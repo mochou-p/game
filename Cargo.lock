@@ -747,14 +747,21 @@ dependencies = [
 name = "game_client"
 version = "0.0.0"
 dependencies = [
+ "game_protocol",
  "ggez",
+ "tokio",
 ]
+
+[[package]]
+name = "game_protocol"
+version = "0.0.0"
 
 [[package]]
 name = "game_server"
 version = "0.0.0"
 dependencies = [
  "database_core",
+ "game_protocol",
  "tokio",
 ]
 
