@@ -1,6 +1,10 @@
 # mochou-p/game/game/protocol/Cargo.toml
 
 [package]
-name    = "game_protocol"
-edition = "2024"
+name     = "game_protocol"
+edition  = "2024"
+
+[dependencies]
+postcard = "1.1.3"
+serde    = { version = "1.0.229", features = ["derive"] }
 

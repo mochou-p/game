@@ -5,7 +5,7 @@ name          = "game_server"
 edition       = "2024"
 
 [dependencies]
-database_core = { workspace = true }
-game_protocol = { workspace = true }
-tokio         = { workspace = true }
+database_core = { path      = "../../database/core" }
+game_protocol = { path      = "../protocol"         }
+tokio         = { workspace = true                  }
 

@@ -29,7 +29,7 @@ async fn main() {
 
     loop {
         let (client, _) = server.accept().await.unwrap();
-        tokio::spawn(async move { handle_client(client).await; });
+        tokio::spawn(handle_client(client));
     }
 }
 

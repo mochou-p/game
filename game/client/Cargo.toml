@@ -5,7 +5,7 @@ name          = "game_client"
 edition       = "2024"
 
 [dependencies]
-game_protocol = { workspace = true }
+game_protocol = { path      = "../protocol" }
 ggez          = "0.10.0"
-tokio         = { workspace = true }
+tokio         = { workspace = true          }
 

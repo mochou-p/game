@@ -1,5 +1,6 @@
 // mochou-p/game/game/client/src/game.rs
 
+use std::collections::VecDeque;
 use ggez::glam::{vec2, Vec2};
 use ggez::winit::keyboard::PhysicalKey;
 use ggez::{Context, ContextBuilder, GameResult};
@@ -7,9 +8,11 @@ use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
 use ggez::graphics::{Canvas, Color, Image, Rect, Text, TextAlign, TextFragment, TextLayout};
 use ggez::event::{self, EventHandler};
 use ggez::input::keyboard::{KeyCode, KeyInput};
+use tokio::sync::mpsc::{Receiver, Sender};
+use super::network::{ClientMessage, ServerMessage};
 
 
-pub fn run() {
+pub fn run(g2n_w: Sender<ClientMessage>, n2g_r: Receiver<ServerMessage>) {
     let title = String::from("game");
 
     let (mut ctx, event_loop) = ContextBuilder::new(&title, "mochou-p")
@@ -40,12 +43,16 @@ pub fn run() {
         .build()
         .unwrap();
 
-    let game = Game::new(&mut ctx);
+    let game = Game::new(&mut ctx, g2n_w, n2g_r);
 
     event::run(ctx, event_loop, game).unwrap();
 }
 
 struct Game {
+    g2n_w:                 Sender<ClientMessage>,
+    n2g_r:                 Receiver<ServerMessage>,
+    network_token:         Option<u128>,
+    network_queue:         VecDeque<ClientMessage>,
     camera_follows_player: bool,
     window_size:           Vec2,
     image:                 Image,
@@ -58,7 +65,11 @@ struct Game {
 }
 
 impl Game {
-    pub fn new(ctx: &mut Context) -> Self {
+    pub fn new(
+        ctx:   &mut Context,
+        g2n_w: Sender<ClientMessage>,
+        n2g_r: Receiver<ServerMessage>
+    ) -> Self {
         let     image        = Image::from_bytes(ctx, include_bytes!("../assets/images/player.png")).unwrap();
         let     image_width  = image. width() as f32;
         let     image_height = image.height() as f32;
@@ -66,12 +77,13 @@ impl Game {
         let mut text         = Text::new(TextFragment { text: String::from("you"), ..Default::default() });
         let     text_offset  = vec2(0.0, image_height * 0.75);
 
-        text.set_layout(TextLayout {
-            h_align: TextAlign::Middle,
-            v_align: TextAlign::Middle
-        });
+        text.set_layout(TextLayout { h_align: TextAlign::Middle, v_align: TextAlign::Middle });
 
         Self {
+            g2n_w,
+            n2g_r,
+            network_token:         None,
+            network_queue:         VecDeque::with_capacity(32),
             camera_follows_player: false,
             window_size:           Vec2::from(ctx.gfx.drawable_size()),
             image,
@@ -84,7 +96,35 @@ impl Game {
         }
     }
 
-    fn screen_coordinates(&self) -> Rect {
+    fn network_recv(&mut self) {
+        while let Ok(message) = self.n2g_r.try_recv() {
+            match message {
+                ServerMessage::Tcp(tcp_message) => match tcp_message {
+                    game_protocol::tcp::ServerToClient::Handshake { token } => {
+                        println!("tcp handshake: {token}");
+                        self.network_token = Some(token);
+
+                        self.network_queue.push_back(ClientMessage::Udp(
+                            game_protocol::udp::ClientToServer::Temp
+                        ));
+                    }
+                },
+                ServerMessage::Udp(udp_message) => match udp_message {
+                    game_protocol::udp::ServerToClient::Temp => {
+                        println!("udp temp");
+                    }
+                }
+            }
+        }
+    }
+
+    fn network_send(&mut self) {
+        while let Some(message) = self.network_queue.pop_front() {
+            self.g2n_w.try_send(message).unwrap();
+        }
+    }
+
+    fn camera(&self) -> Rect {
         let mut top_left = -self.window_size * 0.5;
 
         if self.camera_follows_player {
@@ -94,8 +134,17 @@ impl Game {
         Rect::new(top_left.x, top_left.y, self.window_size.x, self.window_size.y)
     }
 
+    fn update_world(&mut self, ctx: &mut Context) {
+        let fixed_movement = self.movement
+            .clamp(Vec2::NEG_ONE, Vec2::ONE)
+            .try_normalize()
+            .unwrap_or(Vec2::ZERO);
+
+        self.position += fixed_movement * self.speed * ctx.time.delta().as_secs_f32();
+    }
+
     fn draw_world(&self, canvas: &mut Canvas) {
-        canvas.set_screen_coordinates(self.screen_coordinates());
+        canvas.set_screen_coordinates(self.camera());
 
         canvas.draw(&self.image, self.position - self.image_offset);
         canvas.draw(&self. text, self.position - self. text_offset);
@@ -110,12 +159,9 @@ impl Game {
 
 impl EventHandler for Game {
     fn update(&mut self, ctx: &mut Context) -> GameResult {
-        let fixed_movement = self.movement
-            .clamp(Vec2::NEG_ONE, Vec2::ONE)
-            .try_normalize()
-            .unwrap_or(Vec2::ZERO);
-
-        self.position += fixed_movement * self.speed * ctx.time.delta().as_secs_f32();
+        self.network_recv();
+        self.update_world(ctx);
+        self.network_send();
 
         Ok(())
     }
