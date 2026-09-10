@@ -8,4 +8,4 @@ edition       = "2024"
 database_core = { path      = "../../database/core" }
 game_protocol = { path      = "../protocol"         }
 tokio         = { workspace = true                  }
-
+utils         = { path      = "../../utils"         }

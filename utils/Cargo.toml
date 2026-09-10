@@ -1,0 +1,6 @@
+# mochou-p/game/utils/Cargo.toml
+
+[package]
+name    = "utils"
+edition = "2024"
+

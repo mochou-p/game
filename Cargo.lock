@@ -780,6 +780,7 @@ dependencies = [
  "game_protocol",
  "ggez",
  "tokio",
+ "utils",
 ]
 
 [[package]]
@@ -788,6 +789,8 @@ version = "0.0.0"
 dependencies = [
  "postcard",
  "serde",
+ "tokio",
+ "utils",
 ]
 
 [[package]]
@@ -797,6 +800,7 @@ dependencies = [
  "database_core",
  "game_protocol",
  "tokio",
+ "utils",
 ]
 
 [[package]]
@@ -2989,6 +2993,10 @@ name = "unicode-width"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
+
+[[package]]
+name = "utils"
+version = "0.0.0"
 
 [[package]]
 name = "uuid"

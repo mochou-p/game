@@ -1,17 +1,18 @@
 // mochou-p/game/game/client/src/network.rs
 
-use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use std::time::Duration;
 use tokio::net::{TcpStream, UdpSocket};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::watch::Receiver as Watch;
-use game_protocol::postcard;
 
 
+#[derive(Debug)]
 pub enum ServerMessage {
     Tcp(game_protocol::tcp::ServerToClient),
     Udp(game_protocol::udp::ServerToClient)
 }
 
+#[derive(Debug)]
 pub enum ClientMessage {
     Tcp(game_protocol::tcp::ClientToServer),
     Udp(game_protocol::udp::ClientToServer)
@@ -21,14 +22,21 @@ pub fn spawn(
     n2g_w:   Sender<ServerMessage>,
     g2n_r: Receiver<ClientMessage>,
     stop:     Watch<bool>
-) -> std::thread::JoinHandle<()> {
-    std::thread::spawn(|| {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(actor(n2g_w, g2n_r, stop))
-    })
+) -> Option<std::thread::JoinHandle<()>> {
+    match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => {
+            Some(std::thread::spawn(move || {
+                runtime.block_on(actor(n2g_w, g2n_r, stop))
+            }))
+        },
+        Err(err) => {
+            utils::error!("failed to create tokio runtime: {err}");
+            None
+        }
+    }
 }
 
 async fn actor(
@@ -39,81 +47,133 @@ async fn actor(
     const ADDRESS: [u8; 4] = [127, 0, 0, 1];
 
     let     tcp_address = format!("{}.{}.{}.{}:{}", ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3], game_protocol::tcp::PORT);
-    let mut tcp         = TcpStream::connect(tcp_address).await.unwrap();
+    let mut tcp         = loop {
+        match TcpStream::connect(&tcp_address).await {
+            Ok (ok ) => break ok,
+            Err(err) => {
+                let timeout = 5;
+                utils::warning!("failed to connect to TCP server: {err} (retrying after {timeout} seconds)");
 
-    let udp_client_address = format!("{}.{}.{}.{}:0",  ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3]);
-    let udp_server_address = format!("{}.{}.{}.{}:{}", ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3], game_protocol::udp::PORT);
-    let udp                = UdpSocket::bind(udp_client_address).await.unwrap();
+                tokio::select! {
+                    _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+                        continue;
+                    }
 
-    udp.connect(udp_server_address).await.unwrap();
+                    _ = stop.changed() => {
+                        if *stop.borrow() {
+                            utils::debug!("saw game end");
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    };
 
-    println!("\x1b[32;1m[{} network actor online]\x1b[0m", env!("CARGO_BIN_NAME"));
+    let     udp_client_address = format!("{}.{}.{}.{}:0",  ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3]);
+    let     udp_server_address = format!("{}.{}.{}.{}:{}", ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3], game_protocol::udp::PORT);
+    let mut udp                = match UdpSocket::bind(udp_client_address).await {
+        Ok (ok ) => ok,
+        Err(err) => {
+            utils::error!("failed to bind UDP socket: {err} (giving up on networking :D)");
+            return;
+        }
+    };
+
+    while let Err(err) = udp.connect(&udp_server_address).await {
+        let timeout = 5;
+        utils::warning!("failed to connect to UDP server: {err} (retrying after {timeout} seconds)");
+
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+                continue;
+            }
+
+            _ = stop.changed() => {
+                if *stop.borrow() {
+                    utils::debug!("saw game end");
+                    return;
+                }
+            }
+        }
+    }
+
+    utils::ok!("network actor online");
 
     let mut tcp_read_buffer  = [0; game_protocol::tcp::MAX_SERVER_LEN as usize];
     let mut tcp_write_buffer = [0; game_protocol::tcp::MAX_CLIENT_LEN as usize];
     let mut udp_read_buffer  = [0; game_protocol::udp::MAX_SERVER_LEN as usize];
     let mut udp_write_buffer = [0; game_protocol::udp::MAX_CLIENT_LEN as usize];
 
-    let message = game_protocol::tcp::ClientToServer::LetsShakeHands;
-    let   bytes = postcard::to_slice(&message, &mut tcp_write_buffer).unwrap();
-
-    tcp.write_u16(bytes.len() as u16).await.unwrap();
-    tcp.write_all(bytes             ).await.unwrap();
-
     loop {
         tokio::select! {
             // TODO: its not cancel safe T_T
-            result = tcp.read_u16() => {
-                let length = result.unwrap();
-                assert!(length <= game_protocol::tcp::MAX_SERVER_LEN);
-                let length = length as usize;
+            result = game_protocol::tcp::recv_s2c(&mut tcp, &mut tcp_read_buffer) => {
+                let Some(incoming) = result else {
+                    continue;
+                };
 
-                // NOTE: does this await block the select?
-                tcp.read_exact(&mut tcp_read_buffer[..length]).await.unwrap();
-                let message = postcard::from_bytes(&tcp_read_buffer[..length]).unwrap();
+                utils::debug!("INCOMING TCP: {incoming:?}");
 
-                n2g_w.send(ServerMessage::Tcp(message)).await.unwrap();
+                if let Err(err) = n2g_w.send(ServerMessage::Tcp(incoming)).await {
+                    utils::error!("n2g channel send failed: {err}");
+                    continue;
+                }
             },
 
-            result = udp.recv(&mut udp_read_buffer) => {
-                let length = result.unwrap();
-                assert!(length <= game_protocol::udp::MAX_SERVER_LEN as usize);
+            result = game_protocol::udp::recv_s2c(&mut udp, &mut udp_read_buffer) => {
+                let Some(incoming) = result else {
+                    continue;
+                };
 
-                let message = postcard::from_bytes(&udp_read_buffer[..length]).unwrap();
+                utils::debug!("INCOMING UDP: {incoming:?}");
 
-                n2g_w.send(ServerMessage::Udp(message)).await.unwrap();
+                if let Err(err) = n2g_w.send(ServerMessage::Udp(incoming)).await {
+                    utils::error!("n2g channel send failed: {err}");
+                    continue;
+                }
             },
 
             result = g2n_r.recv() => {
-                let message = result.unwrap();
+                let message = match result {
+                    Some(some) => some,
+                    None => {
+                        utils::error!("g2n channel closed");
+                        break;
+                    }
+                };
 
                 match message {
-                    ClientMessage::Tcp(tcp_message) => {
-                        let bytes  = postcard::to_slice(&tcp_message, &mut tcp_write_buffer).unwrap();
-                        let length = bytes.len();
-                        assert!(length <= game_protocol::tcp::MAX_CLIENT_LEN as usize);
+                    ClientMessage::Tcp(outgoing) => {
+                        utils::debug!("OUTGOING TCP: {outgoing:?}");
 
-                        tcp.write_u16(length as u16).await.unwrap();
-                        tcp.write_all(bytes        ).await.unwrap();
+                        game_protocol::tcp::send_c2s(
+                            &mut tcp,
+                            outgoing,
+                            &mut tcp_write_buffer
+                        ).await;
                     },
-                    ClientMessage::Udp(udp_message) => {
-                        let bytes  = postcard::to_slice(&udp_message, &mut udp_write_buffer).unwrap();
-                        let length = bytes.len();
-                        assert!(length <= game_protocol::udp::MAX_CLIENT_LEN as usize);
+                    ClientMessage::Udp(outgoing) => {
+                        utils::debug!("OUTGOING UDP: {outgoing:?}");
 
-                        udp.send(bytes).await.unwrap();
+                        game_protocol::udp::send_c2s(
+                            &mut udp,
+                            outgoing,
+                            &mut udp_write_buffer
+                        ).await;
                     }
                 }
             },
 
             _ = stop.changed() => {
                 if *stop.borrow() {
+                    utils::debug!("saw game end");
                     break;
                 }
             }
         }
     }
 
-    println!("\x1b[31;1m[{} network actor offline]\x1b[0m", env!("CARGO_BIN_NAME"));
+    utils::info!("network actor offline");
 }
 

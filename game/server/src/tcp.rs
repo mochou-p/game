@@ -1,61 +1,91 @@
 // mochou-p/game/game/server/src/tcp.rs
 
-use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use std::net::SocketAddr;
+use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch::Receiver;
-use game_protocol::postcard;
 
+
+static COUNTER: AtomicU32 = AtomicU32::new(0);
 
 pub async fn bind(mut stop: Receiver<bool>) {
     const ADDRESS: [u8; 4] = [127, 0, 0, 1];
 
     let address = format!("{}.{}.{}.{}:{}", ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3], game_protocol::tcp::PORT);
-    let server  = TcpListener::bind(address).await.unwrap();
+    let server  = match TcpListener::bind(address).await {
+        Ok (ok ) => ok,
+        Err(err) => {
+            utils::error!("failed to bind listener: {err}");
+            return;
+        }
+    };
 
-    println!("\x1b[32;1m[{} TCP online]\x1b[0m", env!("CARGO_BIN_NAME"));
+    utils::ok!("online");
 
     loop {
         tokio::select! {
             result = server.accept() => {
-                let (client, _) = result.unwrap();
-                tokio::spawn(handle_client(client));
+                match result {
+                    Ok((stream, address)) => {
+                        tokio::spawn(handle_client(stream, address));
+                    },
+                    Err(err) => {
+                        utils::warning!("failed to accept a peer: {err}");
+                    }
+                }
             },
 
             _ = stop.changed() => {
                 if *stop.borrow() {
+                    utils::debug!("saw ^C");
                     break;
                 }
             }
         }
     }
 
-    println!("\x1b[31;1m[{} TCP offline]\x1b[0m", env!("CARGO_BIN_NAME"));
+    utils::info!("offline");
 }
 
-async fn handle_client(mut client: TcpStream) {
+async fn handle_client(mut stream: TcpStream, address: SocketAddr) {
+    utils::ok!("{address}: connected");
+
     let mut  read_buffer = [0; game_protocol::tcp::MAX_CLIENT_LEN as usize];
     let mut write_buffer = [0; game_protocol::tcp::MAX_SERVER_LEN as usize];
 
     loop {
-        let length = client.read_u16().await.unwrap();
-        assert!(length <= game_protocol::tcp::MAX_CLIENT_LEN);
-        let length = length as usize;
+        let Some(incoming) = game_protocol::tcp::recv_c2s(
+            &mut stream,
+            address,
+            &mut read_buffer
+        ).await else {
+            utils::debug!("{address}: dropping connection due to error");
+            break;
+        };
 
-        client.read_exact(&mut read_buffer[..length]).await.unwrap();
-        let message = postcard::from_bytes(&read_buffer[..length]).unwrap();
+        utils::debug!("{address}: INCOMING: {incoming:?}");
 
-        match message {
+        let outgoing = match incoming {
             game_protocol::tcp::ClientToServer::LetsShakeHands => {
-                let token   = 1234567890;
-                let message = game_protocol::tcp::ServerToClient::Handshake { token };
-                let bytes   = postcard::to_slice(&message, &mut write_buffer).unwrap();
-                let length  = bytes.len();
-                assert!(length <= game_protocol::tcp::MAX_SERVER_LEN as usize);
+                let token = COUNTER.fetch_add(1, Ordering::Relaxed);
 
-                client.write_u16(length as u16).await.unwrap();
-                client.write_all(bytes        ).await.unwrap();
+                game_protocol::tcp::ServerToClient::Handshake { token }
             }
+        };
+
+        utils::debug!("{address}: OUTGOING: {outgoing:?}");
+
+        if !game_protocol::tcp::send_s2c(
+            &mut stream,
+            address,
+            outgoing,
+            &mut write_buffer
+        ).await {
+            utils::debug!("{address}: dropping connection due to error");
+            break;
         }
     }
+
+    utils::info!("{address}: disconnected");
 }
 

@@ -7,15 +7,17 @@ use tokio::sync::{mpsc, watch};
 
 
 fn main() {
-    let (game2network_write, game2network_read) =  mpsc::channel(16);
-    let (network2game_write, network2game_read) =  mpsc::channel(16);
-    let (        stop_write,         stop_read) = watch::channel(false);
+    let ( g2n_w,  g2n_r) =  mpsc::channel(   16);
+    let ( n2g_w,  n2g_r) =  mpsc::channel(   16);
+    let (stop_w, stop_r) = watch::channel(false);
 
-    let network = network::spawn(network2game_write, game2network_read, stop_read);
+    if let Some(net) = network::spawn(n2g_w, g2n_r, stop_r) {
+        game::run(g2n_w, n2g_r);
+        stop_w.send_replace(true);
 
-    game::run(game2network_write, network2game_read);
-    stop_write.send(true).unwrap();
-
-    network.join().unwrap();
+        if let Err(error) = net.join() {
+            utils::error!("failed to join network thread: {error:?}");
+        }
+    }
 }
 

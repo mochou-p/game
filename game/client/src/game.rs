@@ -1,21 +1,23 @@
 // mochou-p/game/game/client/src/game.rs
 
 use std::collections::VecDeque;
-use ggez::glam::{vec2, Vec2};
-use ggez::winit::keyboard::PhysicalKey;
+use ggez::{glam, winit};
 use ggez::{Context, ContextBuilder, GameResult};
 use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
 use ggez::graphics::{Canvas, Color, Image, Rect, Text, TextAlign, TextFragment, TextLayout};
 use ggez::event::{self, EventHandler};
 use ggez::input::keyboard::{KeyCode, KeyInput};
+use glam::{vec2, Vec2};
+use winit::event_loop::EventLoop;
+use winit::keyboard::PhysicalKey;
 use tokio::sync::mpsc::{Receiver, Sender};
 use super::network::{ClientMessage, ServerMessage};
 
 
-pub fn run(g2n_w: Sender<ClientMessage>, n2g_r: Receiver<ServerMessage>) {
+fn init() -> GameResult<(Context, EventLoop<()>)> {
     let title = String::from("game");
 
-    let (mut ctx, event_loop) = ContextBuilder::new(&title, "mochou-p")
+    ContextBuilder::new(&title, "mochou-p")
         .with_conf_file(false)
         .window_setup(WindowSetup {
             title,
@@ -41,17 +43,36 @@ pub fn run(g2n_w: Sender<ClientMessage>, n2g_r: Receiver<ServerMessage>) {
             logical_size:                  None
         })
         .build()
-        .unwrap();
+}
 
-    let game = Game::new(&mut ctx, g2n_w, n2g_r);
+pub fn run(g2n_w: Sender<ClientMessage>, n2g_r: Receiver<ServerMessage>) {
+    match init() {
+        Ok((mut ctx, event_loop)) => {
+            match Game::new(&mut ctx, g2n_w, n2g_r) {
+                Ok(mut state) => {
+                    state.network_queue.push_back(ClientMessage::Udp(
+                        game_protocol::udp::ClientToServer::Temp
+                    ));
 
-    event::run(ctx, event_loop, game).unwrap();
+                    if let Err(game_error) = event::run(ctx, event_loop, state) {
+                        utils::error!("game crashed: {game_error}");
+                    }
+                },
+                Err(game_error) => {
+                    utils::error!("failed to create game state: {game_error}");
+                }
+            }
+        },
+        Err(game_error) => {
+            utils::error!("failed to initialize ggez: {game_error}");
+        }
+    }
 }
 
 struct Game {
     g2n_w:                 Sender<ClientMessage>,
     n2g_r:                 Receiver<ServerMessage>,
-    network_token:         Option<u128>,
+    network_token:         Option<u32>,
     network_queue:         VecDeque<ClientMessage>,
     camera_follows_player: bool,
     window_size:           Vec2,
@@ -69,8 +90,8 @@ impl Game {
         ctx:   &mut Context,
         g2n_w: Sender<ClientMessage>,
         n2g_r: Receiver<ServerMessage>
-    ) -> Self {
-        let     image        = Image::from_bytes(ctx, include_bytes!("../assets/images/player.png")).unwrap();
+    ) -> GameResult<Self> {
+        let     image        = Image::from_bytes(ctx, include_bytes!("../assets/images/player.png"))?;
         let     image_width  = image. width() as f32;
         let     image_height = image.height() as f32;
         let     image_offset = vec2(image_width * 0.5, image_height * 0.5);
@@ -79,7 +100,7 @@ impl Game {
 
         text.set_layout(TextLayout { h_align: TextAlign::Middle, v_align: TextAlign::Middle });
 
-        Self {
+        Ok(Self {
             g2n_w,
             n2g_r,
             network_token:         None,
@@ -93,7 +114,7 @@ impl Game {
             position:              Vec2::ZERO,
             movement:              Vec2::ZERO,
             speed:                 200.0
-        }
+        })
     }
 
     fn network_recv(&mut self) {
@@ -101,7 +122,6 @@ impl Game {
             match message {
                 ServerMessage::Tcp(tcp_message) => match tcp_message {
                     game_protocol::tcp::ServerToClient::Handshake { token } => {
-                        println!("tcp handshake: {token}");
                         self.network_token = Some(token);
 
                         self.network_queue.push_back(ClientMessage::Udp(
@@ -110,9 +130,7 @@ impl Game {
                     }
                 },
                 ServerMessage::Udp(udp_message) => match udp_message {
-                    game_protocol::udp::ServerToClient::Temp => {
-                        println!("udp temp");
-                    }
+                    game_protocol::udp::ServerToClient::Temp => ()
                 }
             }
         }
@@ -120,7 +138,10 @@ impl Game {
 
     fn network_send(&mut self) {
         while let Some(message) = self.network_queue.pop_front() {
-            self.g2n_w.try_send(message).unwrap();
+            if let Err(err) = self.g2n_w.try_send(message) {
+                utils::error!("g2n channel try_send failed: {err}");
+                continue;
+            }
         }
     }
 
