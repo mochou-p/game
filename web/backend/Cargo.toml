@@ -8,5 +8,6 @@ edition       = "2024"
 database_core = { path      = "../../database/core"                }
 rspond        = { git       = "https://github.com/mochou-p/rspond" }
 tokio         = { workspace = true                                 }
+utils         = { path      = "../../utils"                        }
 web_frontend  = { path      = "../frontend"                        }
 

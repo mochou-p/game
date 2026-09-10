@@ -8,7 +8,7 @@ pub fn validate_body(body: &[u8]) -> Vec<u8> {
         return response::bad_request();
     };
 
-    let Some(token) = database_core::register(username.clone(), password) else {
+    let Ok(Some(token)) = database_core::register(username.clone(), password) else {
         return response::internal_server_error();
     };
 

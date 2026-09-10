@@ -1,7 +1,7 @@
 // mochou-p/game/web/backend/src/request.rs
 
 use std::collections::HashMap;
-use super::utils;
+use super::web_utils;
 
 
 pub const MAX_LEN: usize = 2048;
@@ -18,28 +18,28 @@ impl<'a> Request<'a> {
     pub fn parse(data: &'a [u8]) -> Option<Self> {
         let     window       = data;
 
-        let     end          = utils::find_byte(window, b' ')?;
+        let     end          = web_utils::find_byte(window, b' ')?;
         let     method       = &window[..end];
         let     window       = &window[end+1..];
 
-        let     end          = utils::find_byte(window, b' ')?;
+        let     end          = web_utils::find_byte(window, b' ')?;
         let     path         = &window[..end];
         let     window       = &window[end+1..];
 
-        let     end          = utils::find_bytes(window, b"\r\n")?;
+        let     end          = web_utils::find_bytes(window, b"\r\n")?;
         let     version      = &window[..end];
         let     window       = &window[end+2..];
 
-        let     body_start   = utils::find_bytes(window, b"\r\n\r\n")?;
+        let     body_start   = web_utils::find_bytes(window, b"\r\n\r\n")?;
 
         let mut header_range = &window[..body_start+2];
         let     body         = &window[body_start+4..];
         let mut headers      = HashMap::new();
 
-        while let Some(i) = utils::find_bytes(header_range, b"\r\n") {
+        while let Some(i) = web_utils::find_bytes(header_range, b"\r\n") {
             let line  = &header_range[..i];
 
-            let j     = utils::find_bytes(line, b": ")?;
+            let j     = web_utils::find_bytes(line, b": ")?;
             let key   = &line[..j];
             let value = &line[j+2..];
 

@@ -1,4 +1,4 @@
-// mochou-p/game/web/backend/src/utils.rs
+// mochou-p/game/web/backend/src/web_utils.rs
 
 pub fn find_byte(bytes: &[u8], pattern: u8) -> Option<usize> {
     for (i, byte) in bytes.iter().enumerate() {

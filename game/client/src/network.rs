@@ -71,7 +71,6 @@ async fn actor(
     };
 
     let     udp_client_address = format!("{}.{}.{}.{}:0",  ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3]);
-    let     udp_server_address = format!("{}.{}.{}.{}:{}", ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3], game_protocol::udp::PORT);
     let mut udp                = match UdpSocket::bind(udp_client_address).await {
         Ok (ok ) => ok,
         Err(err) => {
@@ -80,6 +79,7 @@ async fn actor(
         }
     };
 
+    let udp_server_address = format!("{}.{}.{}.{}:{}", ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3], game_protocol::udp::PORT);
     while let Err(err) = udp.connect(&udp_server_address).await {
         let timeout = 5;
         utils::warning!("failed to connect to UDP server: {err} (retrying after {timeout} seconds)");

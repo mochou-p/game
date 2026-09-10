@@ -542,6 +542,7 @@ name = "database_core"
 version = "0.0.0"
 dependencies = [
  "rusqlite",
+ "utils",
 ]
 
 [[package]]
@@ -3242,6 +3243,7 @@ dependencies = [
  "database_core",
  "rspond",
  "tokio",
+ "utils",
  "web_frontend",
 ]
 

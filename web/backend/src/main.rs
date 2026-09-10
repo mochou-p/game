@@ -8,7 +8,7 @@ mod login;
 mod logout;
 mod users;
 mod validation;
-mod utils;
+mod web_utils;
 
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::{TcpListener, TcpStream};
@@ -17,36 +17,80 @@ use request::Request;
 
 #[tokio::main]
 async fn main() {
-    database_core::setup();
+    if let Err(err) = database_core::setup() {
+        utils::error!("failed to setup database: {err}");
+        return;
+    }
 
     const ADDRESS: [u8; 4] = [127, 0, 0, 1];
     const PORT:    u16     = 10069;
 
     let address = format!("{}.{}.{}.{}:{PORT}", ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3]);
-    let server  = TcpListener::bind(address).await.unwrap();
+    let server  = match TcpListener::bind(address).await {
+        Ok (ok ) => ok,
+Err(err) => {
+            utils::error!("failed to bind listener: {err}");
+            return;
+        }
+    };
 
-    println!("\x1b[32;1m[{} online]\x1b[0m", env!("CARGO_BIN_NAME"));
+    utils::ok!("online");
 
     loop {
-        let (client, _) = server.accept().await.unwrap();
-        tokio::spawn(handle_client(client));
+        tokio::select! {
+            result = server.accept() => {
+                match result {
+                    Ok((stream, _)) => {
+                        tokio::spawn(handle_client(stream));
+                    },
+                    Err(err) => {
+                        utils::warning!("failed to accept a peer: {err}");
+                    }
+                }
+            },
+
+            _ = tokio::signal::ctrl_c() => {
+                println!();
+                utils::debug!("saw ^C");
+                break;
+            }
+        }
+    }
+
+    utils::info!("offline");
+}
+
+async fn handle_client(mut stream: TcpStream) {
+    let Some((buffer, count)) = read_request(&mut stream).await else {
+        return;
+    };
+
+    let response = handle_request(&buffer[..count]);
+
+    if let Err(err) = stream.write_all(&response).await {
+        utils::warning!("failed to write bytes: {err}");
+        return;
     }
 }
 
-async fn handle_client(mut client: TcpStream) {
-    let (buffer, count) =   read_request(&mut client).await;
-    let response        = handle_request(&buffer[..count]);
-
-    client.write_all(&response).await.unwrap();
-}
-
-async fn read_request(client: &mut TcpStream) -> ([u8; request::MAX_LEN], usize) {
+async fn read_request(stream: &mut TcpStream) -> Option<([u8; request::MAX_LEN], usize)> {
     let mut buffer = [0; request::MAX_LEN];
-    let     count  = client.read(&mut buffer).await.unwrap();
 
-    assert!(count < request::MAX_LEN);
+    let count = match stream.read(&mut buffer).await {
+        Ok (ok ) => ok,
+        Err(err) => {
+            utils::warning!("failed to read request: {err}");
+            return None;
+        }
+    };
 
-    (buffer, count)
+    // NOTE: even `=` because i dont want to read unbounded
+    if count == 0 || count >= request::MAX_LEN {
+        utils::warning!("invalid request length: {count}");
+        return None;
+    }
+
+    Some((buffer, count))
 }
 
 fn handle_request(data: &[u8]) -> Vec<u8> {

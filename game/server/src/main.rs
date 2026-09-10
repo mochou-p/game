@@ -6,7 +6,10 @@ mod udp;
 
 #[tokio::main]
 async fn main() {
-    database_core::setup();
+    if let Err(err) = database_core::setup() {
+        utils::error!("failed to setup database: {err}");
+        return;
+    }
 
     let (stop_write, stop_read) = tokio::sync::watch::channel(false);
 

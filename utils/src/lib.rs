@@ -16,7 +16,7 @@ macro_rules! style {
             column!(),
             " \x1b[0;3",
             stringify!($color),
-            "m\n{}\x1b[0m\n"
+            "m {}\x1b[0m"
         )
     };
 }
