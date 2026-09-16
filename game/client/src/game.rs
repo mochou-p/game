@@ -11,6 +11,7 @@ use glam::{vec2, Vec2};
 use winit::event_loop::EventLoop;
 use winit::keyboard::PhysicalKey;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::error::TryRecvError;
 use super::network::{ClientMessage, ServerMessage};
 
 
@@ -50,8 +51,8 @@ pub fn run(g2n_w: Sender<ClientMessage>, n2g_r: Receiver<ServerMessage>) {
         Ok((mut ctx, event_loop)) => {
             match Game::new(&mut ctx, g2n_w, n2g_r) {
                 Ok(mut state) => {
-                    state.network_queue.push_back(ClientMessage::Udp(
-                        game_protocol::udp::ClientToServer::Temp
+                    state.network_enqueue(ClientMessage::Tcp(
+                        game_protocol::tcp::ClientToServer::LetsShakeHands
                     ));
 
                     if let Err(game_error) = event::run(ctx, event_loop, state) {
@@ -72,7 +73,8 @@ pub fn run(g2n_w: Sender<ClientMessage>, n2g_r: Receiver<ServerMessage>) {
 struct Game {
     g2n_w:                 Sender<ClientMessage>,
     n2g_r:                 Receiver<ServerMessage>,
-    network_token:         Option<u32>,
+    offline:               bool,
+    network_token:         Option<game_protocol::Token>,
     network_queue:         VecDeque<ClientMessage>,
     camera_follows_player: bool,
     window_size:           Vec2,
@@ -103,6 +105,7 @@ impl Game {
         Ok(Self {
             g2n_w,
             n2g_r,
+            offline:               false,
             network_token:         None,
             network_queue:         VecDeque::with_capacity(32),
             camera_follows_player: false,
@@ -118,19 +121,43 @@ impl Game {
     }
 
     fn network_recv(&mut self) {
-        while let Ok(message) = self.n2g_r.try_recv() {
-            match message {
-                ServerMessage::Tcp(tcp_message) => match tcp_message {
-                    game_protocol::tcp::ServerToClient::Handshake { token } => {
-                        self.network_token = Some(token);
+        loop {
+            if self.offline {
+                return;
+            }
 
-                        self.network_queue.push_back(ClientMessage::Udp(
-                            game_protocol::udp::ClientToServer::Temp
-                        ));
+            match self.n2g_r.try_recv() {
+                Ok(message) => {
+                    match message {
+                        ServerMessage::Tcp(tcp_message) => match tcp_message {
+                            game_protocol::tcp::ServerToClient::Handshake { token } => {
+                                self.network_token = Some(token);
+
+                                self.network_enqueue(ClientMessage::Udp(
+                                    game_protocol::udp::ClientToServer::TokenConfirmation { token }
+                                ));
+                            }
+                        },
+                        ServerMessage::Udp(udp_message) => match udp_message {
+                            game_protocol::udp::ServerToClient::TokenChallenge { nonce } => {
+                                if let Some(token) = self.network_token {
+                                    self.network_enqueue(ClientMessage::Udp(
+                                        game_protocol::udp::ClientToServer::TokenChallenge { token, nonce }
+                                    ));
+                                } else {
+                                    utils::warning!("server asked for a token, but i dont have it");
+                                }
+                            }
+                        }
                     }
                 },
-                ServerMessage::Udp(udp_message) => match udp_message {
-                    game_protocol::udp::ServerToClient::Temp => ()
+                Err(err) => {
+                    if matches!(err, TryRecvError::Disconnected) {
+                        utils::error!("n2g channel closed");
+                        self.offline = true;
+                    }
+
+                    break;
                 }
             }
         }
@@ -142,6 +169,12 @@ impl Game {
                 utils::error!("g2n channel try_send failed: {err}");
                 continue;
             }
+        }
+    }
+
+    fn network_enqueue(&mut self, message: ClientMessage) {
+        if !self.offline {
+            self.network_queue.push_back(message);
         }
     }
 

@@ -3,6 +3,7 @@
 use std::net::SocketAddr;
 use serde::{Serialize, Deserialize};
 use tokio::net::UdpSocket;
+use super::{Token, Nonce};
 
 
 pub const PORT: u16 = 10089;
@@ -12,12 +13,13 @@ pub const MAX_CLIENT_LEN: u16 = 512;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ServerToClient {
-    Temp
+    TokenChallenge { nonce: Nonce }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ClientToServer {
-    Temp
+    TokenConfirmation { token: Token               },
+    TokenChallenge    { token: Token, nonce: Nonce }
 }
 
 pub async fn send_s2c(

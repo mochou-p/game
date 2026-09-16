@@ -98,7 +98,7 @@ async fn actor(
         }
     }
 
-    utils::ok!("network actor online");
+    utils::ok!("online");
 
     let mut tcp_read_buffer  = [0; game_protocol::tcp::MAX_SERVER_LEN as usize];
     let mut tcp_write_buffer = [0; game_protocol::tcp::MAX_CLIENT_LEN as usize];
@@ -106,11 +106,11 @@ async fn actor(
     let mut udp_write_buffer = [0; game_protocol::udp::MAX_CLIENT_LEN as usize];
 
     loop {
+        // TODO: cancel safe?
         tokio::select! {
-            // TODO: its not cancel safe T_T
             result = game_protocol::tcp::recv_s2c(&mut tcp, &mut tcp_read_buffer) => {
                 let Some(incoming) = result else {
-                    continue;
+                    break;
                 };
 
                 utils::debug!("INCOMING TCP: {incoming:?}");
@@ -123,7 +123,7 @@ async fn actor(
 
             result = game_protocol::udp::recv_s2c(&mut udp, &mut udp_read_buffer) => {
                 let Some(incoming) = result else {
-                    continue;
+                    break;
                 };
 
                 utils::debug!("INCOMING UDP: {incoming:?}");
@@ -135,7 +135,7 @@ async fn actor(
             },
 
             result = g2n_r.recv() => {
-                let message = match result {
+                let outgoing = match result {
                     Some(some) => some,
                     None => {
                         utils::error!("g2n channel closed");
@@ -143,22 +143,22 @@ async fn actor(
                     }
                 };
 
-                match message {
-                    ClientMessage::Tcp(outgoing) => {
-                        utils::debug!("OUTGOING TCP: {outgoing:?}");
+                match outgoing {
+                    ClientMessage::Tcp(outgoing_tcp) => {
+                        utils::debug!("OUTGOING TCP: {outgoing_tcp:?}");
 
                         game_protocol::tcp::send_c2s(
                             &mut tcp,
-                            outgoing,
+                            outgoing_tcp,
                             &mut tcp_write_buffer
                         ).await;
                     },
-                    ClientMessage::Udp(outgoing) => {
-                        utils::debug!("OUTGOING UDP: {outgoing:?}");
+                    ClientMessage::Udp(outgoing_udp) => {
+                        utils::debug!("OUTGOING UDP: {outgoing_udp:?}");
 
                         game_protocol::udp::send_c2s(
                             &mut udp,
-                            outgoing,
+                            outgoing_udp,
                             &mut udp_write_buffer
                         ).await;
                     }
@@ -174,6 +174,6 @@ async fn actor(
         }
     }
 
-    utils::info!("network actor offline");
+    utils::info!("offline");
 }
 

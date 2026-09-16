@@ -1,6 +1,9 @@
 # mochou-p/game/utils/Cargo.toml
 
 [package]
-name    = "utils"
-edition = "2024"
+name      = "utils"
+edition   = "2024"
+
+[dependencies]
+getrandom = "0.4.3"
 

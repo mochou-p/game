@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use serde::{Serialize, Deserialize};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::TcpStream;
+use super::Token;
 
 
 pub const PORT: u16 = 10079;
@@ -13,7 +14,7 @@ pub const MAX_CLIENT_LEN: u16 = 512;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ServerToClient {
-    Handshake { token: u32 }
+    Handshake { token: Token }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

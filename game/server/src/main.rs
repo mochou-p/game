@@ -1,7 +1,11 @@
 // mochou-p/game/game/server/src/main.rs
 
+mod client;
+mod state;
 mod tcp;
 mod udp;
+
+use std::sync::Arc;
 
 
 #[tokio::main]
@@ -11,13 +15,14 @@ async fn main() {
         return;
     }
 
+    let state                   = Arc::new(state::State::new());
     let (stop_write, stop_read) = tokio::sync::watch::channel(false);
 
-    let tcp = tokio::spawn(tcp::bind(stop_read.clone()));
-    let udp = tokio::spawn(udp::bind(stop_read        ));
+    let tcp = tokio::spawn(tcp::bind(state.clone(), stop_read.clone()));
+    let udp = tokio::spawn(udp::bind(state,         stop_read        ));
 
-    if let Err(error) = tokio::signal::ctrl_c().await {
-        utils::error!("SIGINT signal failed: {error}");
+    if let Err(err) = tokio::signal::ctrl_c().await {
+        utils::error!("SIGINT signal failed: {err}");
     }
 
     stop_write.send_replace(true);
@@ -25,12 +30,12 @@ async fn main() {
 
     let (tcp_result, udp_result) = tokio::join!(tcp, udp);
 
-    if let Err(error) = tcp_result {
-        utils::error!("tcp task crashed: {error}");
+    if let Err(err) = tcp_result {
+        utils::error!("tcp task crashed: {err}");
     }
 
-    if let Err(error) = udp_result {
-        utils::error!("udp task crashed: {error}");
+    if let Err(err) = udp_result {
+        utils::error!("udp task crashed: {err}");
     }
 }
 
