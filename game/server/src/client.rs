@@ -4,7 +4,9 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::sync::mpsc::Sender;
+use game_core::PlayerId;
 use game_protocol::Token;
+use game_protocol::tcp::ServerToClient;
 
 
 pub struct Clients {
@@ -23,13 +25,14 @@ impl Clients {
 
 #[derive(Debug)]
 pub struct Client {
-    pub tcp: Sender<game_protocol::tcp::ServerToClient>,
-    pub udp: Option<SocketAddr>
+    pub player: Option<PlayerId>,
+    pub tcp:    Sender<game_protocol::tcp::ServerToClient>,
+    pub udp:    Option<SocketAddr>
 }
 
 impl Client {
-    pub fn new(tcp: Sender<game_protocol::tcp::ServerToClient>) -> Self {
-        Self { tcp, udp: None }
+    pub fn new(tcp: Sender<ServerToClient>) -> Self {
+        Self { player: None, tcp, udp: None }
     }
 }
 

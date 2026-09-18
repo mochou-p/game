@@ -6,6 +6,7 @@ edition       = "2024"
 
 [dependencies]
 database_core = { path      = "../../database/core" }
+game_core     = { path      = "../core"             }
 game_protocol = { path      = "../protocol"         }
 tokio         = { workspace = true                  }
 utils         = { path      = "../../utils"         }

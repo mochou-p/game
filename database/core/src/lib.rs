@@ -68,7 +68,7 @@ pub fn register(username: String, password: String) -> Result<Option<String>> {
 pub fn all_users() -> Result<Vec<String>> {
     Database::readonly()?
         .prepare("SELECT username FROM users", |stmt| {
-            stmt.query_map([], |row| Ok(row.get(0)?))?
+            stmt.query_map([], |row| row.get(0))?
                 .collect::<Result<Vec<_>, Error>>()
         })
 }

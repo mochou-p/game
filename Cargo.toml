@@ -4,6 +4,7 @@
 members  = [
     "utils",
     "database/core",
+    "game/core",
     "game/protocol",
     "game/client",
     "game/server",

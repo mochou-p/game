@@ -1,0 +1,9 @@
+# mochou-p/game/game/core/Cargo.toml
+
+[package]
+name    = "game_core"
+edition = "2024"
+
+[dependencies]
+serde   = { workspace = true }
+

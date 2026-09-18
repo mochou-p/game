@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use serde::{Serialize, Deserialize};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::TcpStream;
+use game_core::{PlayerId, PlayerPosition};
 use super::Token;
 
 
@@ -14,7 +15,11 @@ pub const MAX_CLIENT_LEN: u16 = 512;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ServerToClient {
-    Handshake { token: Token }
+    Handshake    { token: Token                              },
+    // --------------------------------------------------------
+    PlayerExists { id:    PlayerId, position: PlayerPosition },
+    PlayerJoined { id:    PlayerId                           },
+    PlayerLeft   { id:    PlayerId                           }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

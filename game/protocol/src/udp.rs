@@ -3,6 +3,7 @@
 use std::net::SocketAddr;
 use serde::{Serialize, Deserialize};
 use tokio::net::UdpSocket;
+use game_core::{PlayerId, PlayerPosition};
 use super::{Token, Nonce};
 
 
@@ -13,13 +14,18 @@ pub const MAX_CLIENT_LEN: u16 = 512;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ServerToClient {
-    TokenChallenge { nonce: Nonce }
+    TokenConfirmed,
+    TokenChallenge { nonce: Nonce                              },
+    // ----------------------------------------------------------
+    PlayerPosition { id:    PlayerId, position: PlayerPosition }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ClientToServer {
-    TokenConfirmation { token: Token               },
-    TokenChallenge    { token: Token, nonce: Nonce }
+    TokenConfirmation { token:    Token                        },
+    TokenChallenge    { token:    Token,          nonce: Nonce },
+    // ----------------------------------------------------------
+    PositionChanged   { position: PlayerPosition               }
 }
 
 pub async fn send_s2c(

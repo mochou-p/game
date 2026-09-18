@@ -5,6 +5,7 @@ name          = "game_client"
 edition       = "2024"
 
 [dependencies]
+game_core     = { path      = "../core"     }
 game_protocol = { path      = "../protocol" }
 ggez          = "0.10.0"
 tokio         = { workspace = true          }

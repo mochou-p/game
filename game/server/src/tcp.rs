@@ -6,6 +6,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio::sync::RwLock;
 use tokio::sync::watch::Receiver;
+use game_core::PlayerId;
 use super::client::Client;
 use super::state::State;
 
@@ -142,18 +143,57 @@ async fn handle_client(
         }
     }
 
-    if let Some(token) = token_maybe {
-        let mut cs = state.clients.write().await;
+    if
+        let Some(token) = token_maybe
+        &&
+        let Some(id   ) = clean_up_client(state.clone(), token).await
+    {
+        // TODO: broadcast, and im probably holding cs lock for too long
+        //       and i also hate these reads
+        let others = {
+            let     cs       = state.clients.read().await;
+            let mut channels = Vec::with_capacity(cs.token2client.0.len());
 
-        if let Some(client) = cs.token2client.remove(&token) {
-            let c = client.read().await;
-
-            if let Some(udp) = c.udp {
-                cs.udpaddr2token.remove(&udp);
+            for client in cs.token2client.0.values() {
+                let c = client.read().await;
+                channels.push(c.tcp.clone());
             }
+
+            channels
+        };
+
+        for other_channel in others {
+            let _ = other_channel.send(
+                game_protocol::tcp::ServerToClient::PlayerLeft { id }
+            ).await;
         }
     }
 
     utils::info!("{address}: disconnected");
+}
+
+async fn clean_up_client(
+    state: Arc<State>,
+    token: game_protocol::Token
+) -> Option<PlayerId> {
+    let mut cs = state.clients.write().await;
+
+    let client = cs.token2client.remove(&token)?;
+
+    let (player_id_maybe, udp_maybe) = {
+        let c = client.read().await;
+        (c.player, c.udp)
+    };
+
+    if let Some(player_id) = player_id_maybe {
+        let mut ps = state.players.write().await;
+        ps.remove(&player_id);
+    }
+
+    if let Some(udp) = udp_maybe {
+        cs.udpaddr2token.remove(&udp);
+    }
+
+    player_id_maybe
 }
 

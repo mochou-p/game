@@ -69,7 +69,6 @@ async fn handle_client(mut stream: TcpStream) {
 
     if let Err(err) = stream.write_all(&response).await {
         utils::warning!("failed to write bytes: {err}");
-        return;
     }
 }
 

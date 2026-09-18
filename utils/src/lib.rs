@@ -50,6 +50,7 @@ macro_rules! elog {
 #[macro_export]
 macro_rules! todo {
     ($($arg:expr),+) => {
+        #[cfg(debug_assertions)]
         utils::log!(5, "TODO", $($arg),+)
     };
 }
@@ -57,6 +58,7 @@ macro_rules! todo {
 #[macro_export]
 macro_rules! debug {
     ($($arg:expr),+) => {
+        #[cfg(debug_assertions)]
         utils::log!(7, "DEBUG", $($arg),+)
     };
 }
@@ -64,6 +66,7 @@ macro_rules! debug {
 #[macro_export]
 macro_rules! info {
     ($($arg:expr),+) => {
+        #[cfg(debug_assertions)]
         utils::log!(6, "INFO", $($arg),+)
     };
 }
@@ -71,7 +74,15 @@ macro_rules! info {
 #[macro_export]
 macro_rules! ok {
     ($($arg:expr),+) => {
+        #[cfg(debug_assertions)]
         utils::log!(2, "OK", $($arg),+)
+    };
+}
+
+#[macro_export]
+macro_rules! important {
+    ($($arg:expr),+) => {
+        utils::log!(4, "IMPORTANT", $($arg),+)
     };
 }
 
@@ -91,7 +102,7 @@ macro_rules! error {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct Map<K: Debug + Eq + Hash, V: Debug>(HashMap<K, V>);
+pub struct Map<K: Debug + Eq + Hash, V: Debug>(pub HashMap<K, V>);
 
 impl<K: Debug + Eq + Hash, V: Debug> Map<K, V> {
     pub fn new() -> Self {
@@ -105,6 +116,10 @@ impl<K: Debug + Eq + Hash, V: Debug> Map<K, V> {
 
     pub fn get(&self, key: &K) -> Option<&V> {
         self.0.get(key)
+    }
+
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        self.0.get_mut(key)
     }
 
     pub fn remove(&mut self, key: &K) -> Option<V> {

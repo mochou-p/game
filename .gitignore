@@ -2,5 +2,6 @@
 
 target/
 database/game.*
+game/client/assets/images/*.png~
 private/
 

@@ -1,10 +1,13 @@
 // mochou-p/game/game/client/src/network.rs
 
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tokio::net::{TcpStream, UdpSocket};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::watch::Receiver as Watch;
 
+
+const IP_ENVVAR: &str = "GAME_SERVER_IP";
 
 #[derive(Debug)]
 pub enum ServerMessage {
@@ -39,14 +42,37 @@ pub fn spawn(
     }
 }
 
+fn client_address() -> String {
+    if std::env::var(IP_ENVVAR).is_ok() {
+        utils::info!("making a public client");
+        format!("0.0.0.0:0")
+    } else {
+        utils::info!("making a localhost client");
+        format!("127.0.0.1:0")
+    }
+}
+
+fn server_address(port: u16) -> String {
+    let address = {
+        if let Ok(ip) = std::env::var(IP_ENVVAR) {
+            utils::info!("connecting to a remote server from ${IP_ENVVAR}");
+            format!("{ip}:{port}")
+        } else {
+            utils::info!("connecting to localhost (empty ${IP_ENVVAR})");
+            format!("127.0.0.1:{port}")
+        }
+    };
+
+    utils::important!("\"{address}\"");
+    address
+}
+
 async fn actor(
         n2g_w:   Sender<ServerMessage>,
     mut g2n_r: Receiver<ClientMessage>,
     mut stop:     Watch<bool>
 ) {
-    const ADDRESS: [u8; 4] = [127, 0, 0, 1];
-
-    let     tcp_address = format!("{}.{}.{}.{}:{}", ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3], game_protocol::tcp::PORT);
+    let     tcp_address = server_address(game_protocol::tcp::PORT);
     let mut tcp         = loop {
         match TcpStream::connect(&tcp_address).await {
             Ok (ok ) => break ok,
@@ -70,7 +96,7 @@ async fn actor(
         }
     };
 
-    let     udp_client_address = format!("{}.{}.{}.{}:0",  ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3]);
+    let     udp_client_address = client_address();
     let mut udp                = match UdpSocket::bind(udp_client_address).await {
         Ok (ok ) => ok,
         Err(err) => {
@@ -79,7 +105,7 @@ async fn actor(
         }
     };
 
-    let udp_server_address = format!("{}.{}.{}.{}:{}", ADDRESS[0], ADDRESS[1], ADDRESS[2], ADDRESS[3], game_protocol::udp::PORT);
+    let udp_server_address = server_address(game_protocol::udp::PORT);
     while let Err(err) = udp.connect(&udp_server_address).await {
         let timeout = 5;
         utils::warning!("failed to connect to UDP server: {err} (retrying after {timeout} seconds)");
@@ -98,6 +124,7 @@ async fn actor(
         }
     }
 
+    super::game::ONLINE.store(true, Ordering::Relaxed);
     utils::ok!("online");
 
     let mut tcp_read_buffer  = [0; game_protocol::tcp::MAX_SERVER_LEN as usize];
@@ -174,6 +201,7 @@ async fn actor(
         }
     }
 
+    super::game::ONLINE.store(false, Ordering::Relaxed);
     utils::info!("offline");
 }
 
