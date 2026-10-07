@@ -1,0 +1,11 @@
+# mochou-p/game/game/bots/Cargo.toml
+
+[package]
+name          = "game_bots"
+edition       = "2024"
+
+[dependencies]
+fastrand      = "2.5.0"
+game_core     = { path      = "../core"     }
+game_protocol = { path      = "../protocol" }
+tokio         = { workspace = true          }

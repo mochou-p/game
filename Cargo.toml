@@ -1,19 +1,47 @@
 # mochou-p/game/Cargo.toml
 
 [workspace]
-members  = [
+members       = [
     "utils",
     "database/core",
     "game/core",
+    "game/bots",
     "game/protocol",
     "game/client",
     "game/server",
     "web/backend",
     "web/frontend"
 ]
-resolver = "3"
+resolver      = "3"
+
+[profile.release]
+opt-level     = 3
+debug         = "none"
+strip         = "symbols"
+lto           = "fat"
+panic         = "abort"
+incremental   = false
+codegen-units = 1
+
+[profile.release.package."*"]
+opt-level     = 3
+debug         = "none"
+strip         = "symbols"
+incremental   = false
+codegen-units = 1
+
+[profile.profiling]
+inherits      = "release"
+debug         = "full"
+strip         = "none"
+lto           = "off"
+
+[profile.profiling.package."*"]
+inherits      = "release"
+debug         = "full"
+strip         = "none"
 
 [workspace.dependencies]
-serde    = { version = "1.0.229", features = ["derive"] }
-tokio    = { version = "1.53.1",  features = ["full"  ] }
+serde         = { version = "1.0.229", features = ["derive"] }
+tokio         = { version = "1.53.1",  features = ["full"  ] }
 

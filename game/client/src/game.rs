@@ -286,6 +286,9 @@ impl EventHandler for Game {
             PhysicalKey::Code(KeyCode::KeyD | KeyCode::ArrowRight) => {
                 self.movement.x += 1.0;
             },
+            PhysicalKey::Code(KeyCode::Space) => {
+                utils::important!("{}", self.players.len());
+            },
             _ => ()
         }
 

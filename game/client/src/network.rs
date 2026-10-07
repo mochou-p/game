@@ -7,8 +7,6 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::watch::Receiver as Watch;
 
 
-const IP_ENVVAR: &str = "GAME_SERVER_IP";
-
 #[derive(Debug)]
 pub enum ServerMessage {
     Tcp(game_protocol::tcp::ServerToClient),
@@ -42,46 +40,21 @@ pub fn spawn(
     }
 }
 
-fn client_address() -> String {
-    if std::env::var(IP_ENVVAR).is_ok() {
-        utils::info!("making a public client");
-        format!("0.0.0.0:0")
-    } else {
-        utils::info!("making a localhost client");
-        format!("127.0.0.1:0")
-    }
-}
-
-fn server_address(port: u16) -> String {
-    let address = {
-        if let Ok(ip) = std::env::var(IP_ENVVAR) {
-            utils::info!("connecting to a remote server from ${IP_ENVVAR}");
-            format!("{ip}:{port}")
-        } else {
-            utils::info!("connecting to localhost (empty ${IP_ENVVAR})");
-            format!("127.0.0.1:{port}")
-        }
-    };
-
-    utils::important!("\"{address}\"");
-    address
-}
-
 async fn actor(
         n2g_w:   Sender<ServerMessage>,
     mut g2n_r: Receiver<ClientMessage>,
     mut stop:     Watch<bool>
 ) {
-    let     tcp_address = server_address(game_protocol::tcp::PORT);
+    let     tcp_address = game_protocol::server_address(game_protocol::tcp::PORT);
     let mut tcp         = loop {
         match TcpStream::connect(&tcp_address).await {
             Ok (ok ) => break ok,
             Err(err) => {
-                let timeout = 5;
-                utils::warning!("failed to connect to TCP server: {err} (retrying after {timeout} seconds)");
+                let interval = 5;
+                utils::warning!("failed to connect to TCP server: {err} (retrying after {interval} seconds)");
 
                 tokio::select! {
-                    _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+                    _ = tokio::time::sleep(Duration::from_secs(interval)) => {
                         continue;
                     }
 
@@ -96,7 +69,7 @@ async fn actor(
         }
     };
 
-    let     udp_client_address = client_address();
+    let     udp_client_address = game_protocol::client_address();
     let mut udp                = match UdpSocket::bind(udp_client_address).await {
         Ok (ok ) => ok,
         Err(err) => {
@@ -105,13 +78,13 @@ async fn actor(
         }
     };
 
-    let udp_server_address = server_address(game_protocol::udp::PORT);
+    let udp_server_address = game_protocol::server_address(game_protocol::udp::PORT);
     while let Err(err) = udp.connect(&udp_server_address).await {
-        let timeout = 5;
-        utils::warning!("failed to connect to UDP server: {err} (retrying after {timeout} seconds)");
+        let interval = 5;
+        utils::warning!("failed to connect to UDP server: {err} (retrying after {interval} seconds)");
 
         tokio::select! {
-            _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+            _ = tokio::time::sleep(Duration::from_secs(interval)) => {
                 continue;
             }
 

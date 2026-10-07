@@ -10,8 +10,8 @@ use super::Token;
 
 pub const PORT: u16 = 10079;
 
-pub const MAX_SERVER_LEN: u16 = 512;
-pub const MAX_CLIENT_LEN: u16 = 512;
+pub const MAX_SERVER_LEN: u16 = 1024;
+pub const MAX_CLIENT_LEN: u16 =  512;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ServerToClient {
@@ -127,7 +127,7 @@ pub async fn send_c2s(
 
 pub async fn recv_s2c(
     server: &mut TcpStream,
-    buffer: &mut [u8; MAX_CLIENT_LEN as usize]
+    buffer: &mut [u8; MAX_SERVER_LEN as usize]
 ) -> Option<ServerToClient> {
     let length = match server.read_u16().await {
         Ok (ok ) => ok,
